@@ -3,94 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Rings: Ultimate Edition</title>
+    <title>Neon Rings: Chaos Physics</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
         body {
-            margin: 0;
-            background-color: #050505;
-            color: #fff;
-            overflow: hidden;
-            font-family: 'Orbitron', sans-serif;
-            touch-action: none;
+            margin: 0; background-color: #050505; color: #fff; overflow: hidden;
+            font-family: 'Orbitron', sans-serif; touch-action: none;
         }
+        canvas { display: block; width: 100vw; height: 100vh; }
 
-        canvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        /* --- ИНТЕРФЕЙС --- */
+        /* ИНТЕРФЕЙС */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            display: flex; flex-direction: column;
+            pointer-events: none; display: flex; flex-direction: column;
             justify-content: center; align-items: center;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(5px);
-            z-index: 10;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); z-index: 10;
         }
 
         #settings-panel {
-            background: rgba(20, 20, 25, 0.95);
-            border: 2px solid #00ffff;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
-            padding: 20px;
-            border-radius: 12px;
-            pointer-events: auto;
-            width: 320px;
-            max-height: 85vh;
-            overflow-y: auto;
-            display: flex; flex-direction: column; gap: 12px;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid #00ffff;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.15);
+            padding: 20px; border-radius: 12px; pointer-events: auto;
+            width: 340px; max-height: 90vh; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 10px;
         }
+        #settings-panel::-webkit-scrollbar { width: 4px; }
+        #settings-panel::-webkit-scrollbar-thumb { background: #00ffff; }
 
-        /* Скроллбар для красоты */
-        #settings-panel::-webkit-scrollbar { width: 6px; }
-        #settings-panel::-webkit-scrollbar-thumb { background: #00ffff; border-radius: 3px; }
+        h2 { margin: 0 0 10px 0; color: #00ffff; text-align: center; font-size: 16px; letter-spacing: 2px; }
 
-        h2 { margin: 0 0 5px 0; color: #00ffff; text-align: center; text-shadow: 0 0 5px #00ffff; font-size: 16px; }
+        .control-group { display: flex; flex-direction: column; gap: 4px; padding-bottom: 5px; border-bottom: 1px solid #333; }
+        .control-group:last-child { border: none; }
 
-        .control-group { display: flex; flex-direction: column; gap: 4px; }
-        label { font-size: 11px; color: #ccc; display: flex; justify-content: space-between; }
+        label { font-size: 11px; color: #aaa; display: flex; justify-content: space-between; text-transform: uppercase; }
         .val { color: #fff; font-weight: bold; }
 
-        input[type=range] { width: 100%; accent-color: #00ffff; cursor: pointer; height: 5px; }
+        input[type=range] { width: 100%; accent-color: #00ffff; cursor: pointer; height: 4px; margin-top: 5px; }
 
         .btn {
-            background: linear-gradient(90deg, #00ffff, #0088ff);
-            border: none; padding: 12px; color: #000;
-            font-weight: bold; font-family: inherit; cursor: pointer;
-            border-radius: 4px; text-transform: uppercase; letter-spacing: 1px;
-            margin-top: 10px;
+            background: #00ffff; color: #000; border: none; padding: 12px;
+            font-weight: 800; font-family: inherit; cursor: pointer;
+            border-radius: 2px; text-transform: uppercase; margin-top: 10px;
+            box-shadow: 0 0 15px rgba(0,255,255,0.4);
+            transition: 0.2s;
         }
+        .btn:hover { background: #fff; box-shadow: 0 0 25px rgba(0,255,255,0.8); }
         .btn:active { transform: scale(0.98); }
-        .btn-red { background: linear-gradient(90deg, #ff4444, #cc0000); color: white; }
+        .btn-red { background: #ff4444; box-shadow: 0 0 15px rgba(255,68,68,0.4); color: white;}
+        .btn-red:hover { background: #ff6666; }
 
         #btn-menu {
             position: absolute; top: 15px; right: 15px;
             width: 40px; height: 40px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: #fff; border-radius: 50%;
-            cursor: pointer; pointer-events: auto;
+            background: rgba(0,0,0,0.5); border: 1px solid #00ffff;
+            color: #00ffff; border-radius: 50%; cursor: pointer; pointer-events: auto;
             display: none; align-items: center; justify-content: center;
-            font-size: 20px; z-index: 5;
+            font-size: 20px; z-index: 5; transition: 0.3s;
         }
+        #btn-menu:hover { background: #00ffff; color: #000; }
 
         #hud {
-            position: absolute; top: 20px; width: 100%;
-            text-align: center; pointer-events: none;
-            text-shadow: 0 0 5px #000;
+            position: absolute; top: 30px; width: 100%; text-align: center; pointer-events: none;
         }
+        .hud-val { font-size: 40px; font-weight: 800; color: #fff; text-shadow: 0 0 20px #00ffff; }
+        .hud-label { font-size: 12px; color: #888; letter-spacing: 3px; }
     </style>
 </head>
 <body>
 
     <div id="hud">
-        <div style="font-size: 18px; color: #aaa;">ОСТАЛОСЬ</div>
-        <div style="font-size: 32px; color: #00ffff; font-weight: bold;" id="rings-left">0</div>
+        <div class="hud-label">TARGETS LEFT</div>
+        <div class="hud-val" id="rings-left">0</div>
     </div>
 
     <button id="btn-menu" onclick="Game.pause()">⚙️</button>
@@ -101,7 +86,7 @@
 
             <div class="control-group">
                 <label>Количество колец: <span id="v-count" class="val">12</span></label>
-                <input type="range" id="i-count" min="3" max="40" value="12" oninput="UI.upd('count', this.value)">
+                <input type="range" id="i-count" min="3" max="50" value="12" oninput="UI.upd('count', this.value)">
             </div>
 
             <div class="control-group">
@@ -111,10 +96,13 @@
 
             <div class="control-group">
                 <label>Толщина линий: <span id="v-thick" class="val">4</span></label>
-                <input type="range" id="i-thick" min="1" max="15" value="4" oninput="UI.upd('thick', this.value)">
+                <input type="range" id="i-thick" min="1" max="20" value="4" oninput="UI.upd('thick', this.value)">
             </div>
 
-            <hr style="border: 0; border-top: 1px solid #333; width: 100%; margin: 5px 0;">
+            <div class="control-group">
+                <label>Размер дырки (°): <span id="v-hole" class="val">50</span></label>
+                <input type="range" id="i-hole" min="20" max="150" value="50" oninput="UI.upd('hole', this.value)">
+            </div>
 
             <div class="control-group">
                 <label>Базовая скорость: <span id="v-rot" class="val">0.015</span></label>
@@ -122,28 +110,27 @@
             </div>
 
             <div class="control-group">
-                <label>Разброс скоростей: <span id="v-step" class="val">0.002</span></label>
-                <input type="range" id="i-step" min="0" max="0.02" step="0.0005" value="0.002" oninput="UI.upd('step', this.value)">
-            </div>
-
-            <hr style="border: 0; border-top: 1px solid #333; width: 100%; margin: 5px 0;">
-
-            <div class="control-group">
-                <label>Размер дырки (°): <span id="v-hole" class="val">50</span></label>
-                <input type="range" id="i-hole" min="20" max="120" value="50" oninput="UI.upd('hole', this.value)">
+                <label>Разница скоростей: <span id="v-step" class="val">0.002</span></label>
+                <input type="range" id="i-step" min="0" max="0.01" step="0.0001" value="0.002" oninput="UI.upd('step', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Скорость мяча: <span id="v-speed" class="val">5</span></label>
-                <input type="range" id="i-speed" min="2" max="20" step="0.5" value="5" oninput="UI.upd('speed', this.value)">
+                <label style="color:#00ffff">Хаос отскока: <span id="v-chaos" class="val">0.3</span></label>
+                <input type="range" id="i-chaos" min="0" max="1.0" step="0.05" value="0.3" oninput="UI.upd('chaos', this.value)">
+                <div style="font-size:9px; color:#666; margin-top:2px;">Влияет на случайность угла и подкрутку</div>
+            </div>
+
+            <div class="control-group">
+                <label>Скорость мяча: <span id="v-speed" class="val">6</span></label>
+                <input type="range" id="i-speed" min="3" max="25" step="0.5" value="6" oninput="UI.upd('speed', this.value)">
             </div>
 
             <div class="control-group">
                 <label>Размер мяча: <span id="v-size" class="val">8</span></label>
-                <input type="range" id="i-size" min="3" max="20" value="8" oninput="UI.upd('size', this.value)">
+                <input type="range" id="i-size" min="3" max="25" value="8" oninput="UI.upd('size', this.value)">
             </div>
 
-            <button class="btn" onclick="Game.start()">ЗАПУСТИТЬ</button>
+            <button class="btn" onclick="Game.start()">ЗАПУСК</button>
             <button class="btn btn-red" id="btn-restart" onclick="Game.restart()" style="display:none">РЕСТАРТ</button>
         </div>
     </div>
@@ -151,12 +138,9 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-    // --- АУДИО (Простые синтезированные звуки) ---
     const AudioSys = {
         ctx: null,
-        init() { 
-            if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
-        },
+        init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
         play(freq, type, vol, decay) {
             if(!this.ctx) return;
             const osc = this.ctx.createOscillator();
@@ -164,28 +148,22 @@
             osc.type = type;
             osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
             gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + decay);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + decay);
             osc.connect(gain); gain.connect(this.ctx.destination);
             osc.start(); osc.stop(this.ctx.currentTime + decay);
         },
-        hit() { this.play(150, 'square', 0.05, 0.1); },
-        pop() { this.play(600 + Math.random()*200, 'sine', 0.1, 0.2); },
-        win() { this.play(440, 'triangle', 0.2, 0.5); setTimeout(()=>this.play(880, 'triangle', 0.2, 0.5), 150); }
+        hit() { this.play(100 + Math.random()*50, 'square', 0.1, 0.1); },
+        pop() { this.play(400 + Math.random()*400, 'sine', 0.15, 0.3); },
+        win() { this.play(600, 'triangle', 0.2, 0.6); }
     };
 
-    // --- ПАРАМЕТРЫ ---
     const CFG = {
-        count: 12,
-        gap: 30,
-        thick: 4,
-        rotBase: 0.015,
-        rotStep: 0.002, // Разница скоростей
-        holeDeg: 50,
-        speed: 5,
-        ballR: 8
+        count: 12, gap: 30, thick: 4,
+        rotBase: 0.015, rotStep: 0.002,
+        holeDeg: 50, speed: 6, ballR: 8,
+        chaos: 0.3 // Новый параметр
     };
 
-    // --- КЛАССЫ ---
     class Ball {
         constructor() {
             this.x = 0; this.y = 0;
@@ -202,56 +180,68 @@
         }
 
         update() {
-            // Сохраняем предыдущую позицию для коллизий
-            this.prevX = this.x;
-            this.prevY = this.y;
             this.prevDist = Math.sqrt(this.x*this.x + this.y*this.y);
-
-            // Движение
             this.x += this.vx;
             this.y += this.vy;
-
-            // Текущие данные
             this.dist = Math.sqrt(this.x*this.x + this.y*this.y);
             this.angle = Math.atan2(this.y, this.x);
             if (this.angle < 0) this.angle += Math.PI * 2;
 
-            // Шлейф
             this.trail.push({x: this.x, y: this.y});
-            if(this.trail.length > 20) this.trail.shift();
+            if(this.trail.length > 25) this.trail.shift();
         }
 
         draw(ctx) {
-            // Рисуем шлейф
             if(this.trail.length > 1) {
                 ctx.beginPath();
                 ctx.moveTo(this.trail[0].x, this.trail[0].y);
                 for(let p of this.trail) ctx.lineTo(p.x, p.y);
                 ctx.strokeStyle = `rgba(0, 255, 255, 0.3)`;
-                ctx.lineWidth = CFG.ballR;
-                ctx.lineCap = 'round';
+                ctx.lineWidth = CFG.ballR * 0.6;
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.stroke();
             }
-
-            // Мяч
             ctx.beginPath();
             ctx.arc(this.x, this.y, CFG.ballR, 0, Math.PI*2);
             ctx.fillStyle = '#fff';
-            ctx.shadowColor = '#0ff'; ctx.shadowBlur = 15;
+            ctx.shadowColor = '#0ff'; ctx.shadowBlur = 20;
             ctx.fill();
             ctx.shadowBlur = 0;
         }
 
-        // Отражение от нормали (nx, ny)
-        bounce(nx, ny) {
+        // --- УЛУЧШЕННЫЙ ОТСКОК ---
+        // nx, ny - нормаль стены
+        // wallSpeed - скорость вращения стены (для подкрутки)
+        bounce(nx, ny, wallSpeed) {
+            // 1. Стандартное отражение
             const dot = this.vx * nx + this.vy * ny;
-            this.vx = this.vx - 2 * dot * nx;
-            this.vy = this.vy - 2 * dot * ny;
+            let rx = this.vx - 2 * dot * nx;
+            let ry = this.vy - 2 * dot * ny;
 
-            // Нормализация скорости (чтобы не ускорялся)
-            const mag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
-            this.vx = (this.vx / mag) * CFG.speed;
-            this.vy = (this.vy / mag) * CFG.speed;
+            // 2. Добавляем "Случайный джиттер" (чтобы не было идеальных петель)
+            // Угол отклонения зависит от параметра Chaos
+            const noise = (Math.random() - 0.5) * CFG.chaos; 
+            const cos = Math.cos(noise);
+            const sin = Math.sin(noise);
+
+            // Поворачиваем вектор скорости на случайный угол
+            let fx = rx * cos - ry * sin;
+            let fy = rx * sin + ry * cos;
+
+            // 3. Добавляем "Эффект трения" от вращения кольца
+            // Вектор касательной (перпендикуляр к нормали)
+            let tx = -ny; 
+            let ty = nx;
+
+            // Сила подкрутки зависит от скорости кольца и параметра Chaos
+            let spinForce = wallSpeed * 30 * CFG.chaos; 
+            fx += tx * spinForce;
+            fy += ty * spinForce;
+
+            // 4. Нормализация (возвращаем идеальную скорость)
+            const mag = Math.sqrt(fx*fx + fy*fy);
+            this.vx = (fx / mag) * CFG.speed;
+            this.vy = (fy / mag) * CFG.speed;
 
             AudioSys.hit();
         }
@@ -262,83 +252,57 @@
             this.idx = idx;
             this.active = true;
             this.radius = 50 + (idx * CFG.gap);
-
-            // Скорость вращения: База + (Шаг * Индекс). 
-            // Чередуем направление для красоты (четные в одну, нечетные в другую)
+            // Чередование и скорость
             let dir = idx % 2 === 0 ? 1 : -1;
-            this.speed = (CFG.rotBase + (idx * CFG.rotStep)) * dir;
-
+            this.rotSpeed = (CFG.rotBase + (idx * CFG.rotStep)) * dir;
             this.angle = Math.random() * Math.PI * 2;
-
-            // Цвет
             this.hue = (idx / CFG.count) * 360; 
         }
 
         update() {
             if(!this.active) return;
-            this.angle += this.speed;
-            // Нормализация угла 0..2PI
-            this.angle = this.angle % (Math.PI*2);
+            this.angle += this.rotSpeed;
+            this.angle %= (Math.PI*2);
             if(this.angle < 0) this.angle += Math.PI*2;
         }
 
-        // Проверка столкновения
         check(ball) {
             if(!this.active) return;
-
-            // Граница кольца (внутренняя стенка)
-            // Учитываем радиус мяча! Мы бьемся поверхностью мяча о поверхность кольца
             const collisionDist = this.radius - CFG.ballR;
 
-            // 1. Проверяем, пересек ли мяч границу кольца в этом кадре
-            // Было: prevDist < collisionDist
-            // Стало: dist >= collisionDist
+            // Если пересекли границу
             if (ball.prevDist < collisionDist && ball.dist >= collisionDist) {
 
-                // Мяч "ударился" или "пролетает". Проверяем угол.
+                // Проверка дырки
                 const holeRad = (CFG.holeDeg * Math.PI) / 180;
-
-                // Углы дырки
                 let startA = this.angle;
                 let endA = this.angle + holeRad;
 
-                // Нормализуем углы для сравнения
-                const normalize = (a) => {
-                    a = a % (Math.PI*2);
-                    if(a < 0) a += Math.PI*2;
-                    return a;
-                }
+                // Нормализация для проверки
+                const norm = a => (a < 0 ? a + Math.PI*2 : a) % (Math.PI*2);
+                let bA = norm(ball.angle);
+                startA = norm(startA);
+                endA = norm(endA);
 
-                let bA = ball.angle; // Угол мяча
-                startA = normalize(startA);
-                endA = normalize(endA);
-
-                let inGap = false;
-                if(startA < endA) {
-                    inGap = (bA >= startA && bA <= endA);
-                } else {
-                    // Дырка пересекает 0 (например 350° ... 10°)
-                    inGap = (bA >= startA || bA <= endA);
-                }
+                let inGap = (startA < endA) 
+                    ? (bA >= startA && bA <= endA) 
+                    : (bA >= startA || bA <= endA);
 
                 if (inGap) {
-                    // === ПОПАЛ В ДЫРКУ (ЛОПАЕМ) ===
+                    // ПРОШЕЛ
                     this.active = false;
                     AudioSys.pop();
                     Game.explode(this.radius, this.hue);
-                    // Мяч летит дальше, ничего не делаем с его скоростью
                 } else {
-                    // === УДАР ОБ СТЕНУ ===
-                    // Вектор нормали (от центра к мячу, но инвертированный, т.к. бьем изнутри)
-                    // Нормаль поверхности смотрит В ЦЕНТР круга
+                    // ОТСКОК
                     let nx = -ball.x / ball.dist;
                     let ny = -ball.y / ball.dist;
 
-                    ball.bounce(nx, ny);
+                    // Передаем скорость вращения кольца для эффекта подкрутки
+                    ball.bounce(nx, ny, this.rotSpeed);
 
                     // Коррекция позиции (чтобы не застрял)
-                    // Возвращаем его чуть-чуть назад внутрь круга
-                    let pushRatio = (collisionDist - 1) / ball.dist; 
+                    let pushRatio = (collisionDist - 0.5) / ball.dist; 
                     ball.x *= pushRatio;
                     ball.y *= pushRatio;
                 }
@@ -348,51 +312,22 @@
         draw(ctx) {
             if(!this.active) return;
             const holeRad = (CFG.holeDeg * Math.PI) / 180;
-
             ctx.beginPath();
-            // Рисуем дугу (Весь круг КРОМЕ дырки)
-            // start = angle + hole, end = angle
             ctx.arc(0, 0, this.radius, this.angle + holeRad, this.angle);
-
             ctx.strokeStyle = `hsl(${this.hue}, 80%, 60%)`;
             ctx.lineWidth = CFG.thick;
-            ctx.lineCap = 'round'; // Скругленные концы линий
-            ctx.shadowColor = ctx.strokeStyle;
-            ctx.shadowBlur = 10;
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.lineCap = 'round'; 
+            ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 10;
+            ctx.stroke(); ctx.shadowBlur = 0;
         }
     }
 
-    // --- СИСТЕМА ЧАСТИЦ ---
     let particles = [];
-    function updateParticles() {
-        for(let i=particles.length-1; i>=0; i--) {
-            let p = particles[i];
-            p.x += p.vx; p.y += p.vy;
-            p.life -= 0.02;
-            if(p.life <= 0) particles.splice(i, 1);
-        }
-    }
-    function drawParticles(ctx) {
-        for(let p of particles) {
-            ctx.globalAlpha = p.life;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 2 + Math.random()*2, 0, Math.PI*2);
-            ctx.fill();
-        }
-        ctx.globalAlpha = 1;
-    }
-
-    // --- ИГРОВОЙ ЦИКЛ ---
     const Game = {
         canvas: document.getElementById('gameCanvas'),
         ctx: document.getElementById('gameCanvas').getContext('2d'),
-        w: 0, h: 0,
-        running: false,
-        ball: new Ball(),
-        rings: [],
+        w: 0, h: 0, running: false,
+        ball: new Ball(), rings: [],
 
         init() {
             this.resize();
@@ -403,24 +338,18 @@
         resize() {
             this.w = window.innerWidth;
             this.h = window.innerHeight;
-            this.canvas.width = this.w;
-            this.canvas.height = this.h;
+            this.canvas.width = this.w; this.canvas.height = this.h;
         },
 
         start() {
             AudioSys.init();
-
-            // Генерация колец
             this.rings = [];
-            for(let i=0; i<CFG.count; i++) {
-                this.rings.push(new Ring(i));
-            }
-
+            for(let i=0; i<CFG.count; i++) this.rings.push(new Ring(i));
             this.ball.reset();
             particles = [];
 
             document.getElementById('ui-layer').style.display = 'none';
-            document.getElementById('btn-restart').style.display = 'block'; // Показать кнопку рестарт
+            document.getElementById('btn-restart').style.display = 'block';
             document.getElementById('btn-menu').style.display = 'flex';
             this.running = true;
         },
@@ -430,73 +359,60 @@
             document.getElementById('ui-layer').style.display = 'flex';
         },
 
-        restart() {
-            this.start();
-        },
+        restart() { this.start(); },
 
         explode(rad, hue) {
-            // Создаем взрыв по кругу
-            for(let i=0; i<30; i++) {
-                let a = (Math.PI*2 / 30) * i;
+            for(let i=0; i<25; i++) {
+                let a = (Math.PI*2/25)*i;
                 particles.push({
-                    x: Math.cos(a)*rad, 
-                    y: Math.sin(a)*rad,
-                    vx: Math.cos(a)*(2+Math.random()*3),
-                    vy: Math.sin(a)*(2+Math.random()*3),
-                    life: 1.0,
-                    color: `hsl(${hue}, 100%, 70%)`
+                    x: Math.cos(a)*rad, y: Math.sin(a)*rad,
+                    vx: Math.cos(a)*(1+Math.random()*4), vy: Math.sin(a)*(1+Math.random()*4),
+                    life: 1, color: `hsl(${hue}, 100%, 70%)`
                 });
             }
         },
 
         loop() {
-            // Очистка
             this.ctx.fillStyle = '#050505';
             this.ctx.fillRect(0,0,this.w,this.h);
-
-            const cx = this.w/2;
-            const cy = this.h/2;
+            const cx = this.w/2, cy = this.h/2;
 
             if(this.running) {
                 this.ball.update();
-
-                let activeCount = 0;
-                // Проверяем коллизии (от внутренних к внешним)
+                let active = 0;
                 for(let r of this.rings) {
-                    if(r.active) {
-                        r.update();
-                        r.check(this.ball);
-                        activeCount++;
-                    }
+                    if(r.active) { r.update(); r.check(this.ball); active++; }
                 }
-                document.getElementById('rings-left').innerText = activeCount;
+                document.getElementById('rings-left').innerText = active;
 
-                // Проверка вылета
-                if(this.ball.dist > Math.max(this.w, this.h)) {
-                   // Победа/Конец
+                // Очистка частиц
+                for(let i=particles.length-1; i>=0; i--) {
+                    particles[i].x += particles[i].vx;
+                    particles[i].y += particles[i].vy;
+                    particles[i].life -= 0.03;
+                    if(particles[i].life <= 0) particles.splice(i,1);
                 }
-
-                updateParticles();
             }
 
-            // Рендер
             this.ctx.translate(cx, cy);
+            // Рисуем кольца (с внешних)
+            for(let i=this.rings.length-1; i>=0; i--) this.rings[i].draw(this.ctx);
 
-            // Кольца (рисуем с внешних к внутренним для глубины, или наоборот)
-            for(let i=this.rings.length-1; i>=0; i--) {
-                this.rings[i].draw(this.ctx);
+            // Частицы
+            for(let p of particles) {
+                this.ctx.globalAlpha = p.life;
+                this.ctx.fillStyle = p.color;
+                this.ctx.beginPath(); this.ctx.arc(p.x, p.y, 3, 0, Math.PI*2); this.ctx.fill();
             }
+            this.ctx.globalAlpha = 1;
 
-            drawParticles(this.ctx);
             this.ball.draw(this.ctx);
-
             this.ctx.translate(-cx, -cy);
 
             requestAnimationFrame(() => this.loop());
         }
     };
 
-    // --- UI ОБРАБОТКА ---
     const UI = {
         upd(id, val) {
             document.getElementById('v-'+id).innerText = val;
@@ -509,6 +425,7 @@
             if(id === 'hole') CFG.holeDeg = val;
             if(id === 'speed') CFG.speed = val;
             if(id === 'size') CFG.ballR = val;
+            if(id === 'chaos') CFG.chaos = val;
         }
     };
 
