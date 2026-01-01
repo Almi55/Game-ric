@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ETERNA FIXED FINAL</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; overflow: hidden; background-color: #050505;
+            font-family: monospace;
+            touch-action: none; /* Запрет зума и скролла */
+            user-select: none; -webkit-user-select: none;
+        }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+        /* ИНТЕРФЕЙС */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            justify-content: flex-start; padding-top: 15%;
+            align-items: center;
+            background: #120b18;
+            z-index: 50; color: #fff;
+        }
+
+        .btn {
+            background: #4e342e; border: 2px solid #8d6e63; color: #fff;
+            padding: 25px 60px; font-size: 24px; font-weight: bold;
+            margin: 20px; border-radius: 12px;
+            box-shadow: 0 6px 0 #281815;
+            text-transform: uppercase; cursor: pointer;
+        }
+        .btn:active { transform: translateY(6px); box-shadow: none; }
+
+        /* DEBUG */
+        #debug {
+            position: absolute; top: 0; left: 0; color: lime; 
+            background: rgba(0,0,0,0.7); font-size: 12px; 
+            pointer-events: none; z-index: 100; padding: 4px;
+        }
+
+        /* КНОПКИ УПРАВЛЕНИЯ */
+        #controls {
+            display: none; position: absolute; bottom: 0; left: 0; width: 100%; height: 100%;
+            z-index: 40; touch-action: none;
+        }
+
+        .pad { position: absolute; bottom: 20px; display: flex; gap: 15px; }
+        .left-pad { left: 20px; }
+        .right-pad { right: 20px; }
+
+        .key {
+            width: 75px; height: 75px;
+            background: rgba(255,255,255,0.1); 
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 16px; 
+            display: flex; justify-content: center; align-items: center;
+            font-size: 32px; color: white;
+            transition: transform 0.05s;
+        }
+        /* Класс active добавляется JS-ом */
+        .key.active { background: rgba(255, 215, 0, 0.4); border-color: gold; transform: scale(0.9); }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="debug">System OK</div>
+    <canvas id="cvs"></canvas>
+
+    <!-- MENU -->
+    <div id="menu" class="screen">
+        <h1 style="font-size:40px; color:#ffb74d; margin-bottom:10px;">ETERNA</h1>
+        <div id="save-msg" style="color:#aaa; margin-bottom:40px;"></div>
+        <button class="btn" onpointerup="Game.startSequence()">ИГРАТЬ</button>
+    </div>
+
+    <!-- SHOP -->
+    <div id="shop" class="screen hidden">
+        <h2 style="color:lime; margin-top:50px;">УРОВЕНЬ ПРОЙДЕН</h2>
+        <div style="margin-bottom:20px;">ЗОЛОТО: <span id="ui-gold" style="color:gold"></span></div>
+        <button class="btn" onclick="Game.buy('hp')">ЗЕЛЬЕ (50g)</button>
+        <button class="btn" onclick="Game.buy('dmg')">УРОН (150g)</button>
+        <button class="btn" style="background:#2e7d32; margin-top:20px;" onclick="Game.nextLevel()">ДАЛЬШЕ</button>
+    </div>
+
+    <!-- DEAD -->
+    <div id="dead" class="screen hidden">
+        <h1 style="color:#e53935; margin-top:100px;">YOU DIED</h1>
+        <button class="btn" onclick="location.reload()">RESTART</button>
+    </div>
+
+    <!-- CONTROLS -->
+    <div id="controls">
+        <div class="pad left-pad">
+            <div class="key" id="k-left" data-code="l">◀</div>
+            <div class="key" id="k-right" data-code="r">▶</div>
+        </div>
+        <div class="pad right-pad">
+            <div class="key" id="k-jump" data-code="u">▲</div>
+            <div class="key" id="k-atk" data-code="a">⚔</div>
+        </div>
+    </div>
+
+<script>
+// --- ЛОГЕР ---
+const Log = (m) => { try { document.getElementById('debug').innerText = m; } catch(e){} };
+window.onerror = (m) => Log("ERR: " + m);
+
+// --- ГРАФИКА ---
+const GFX = {
+    rect(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); },
+    wall(ctx, x, y) {
+        this.rect(ctx, x, y, 32, 32, '#3e2723');
+        this.rect(ctx, x, y, 32, 2, '#5d4037');
+        ctx.fillStyle = '#4e342e';
+        ctx.fillRect(x+2, y+5, 12, 7); ctx.fillRect(x+16, y+5, 14, 7);
+        ctx.fillRect(x+4, y+16, 18, 7); ctx.fillRect(x+24, y+16, 6, 7);
+    },
+    hero(ctx, x, y, dir, atk) {
+        ctx.save(); ctx.translate(Math.floor(x+16), Math.floor(y+16)); ctx.scale(dir, 1);
+        this.rect(ctx, -6, -10, 12, 18, '#ddd');
+        this.rect(ctx, -6, -10, 12, 8, '#283593'); 
+        this.rect(ctx, -5, -16, 10, 8, '#ccc');
+        this.rect(ctx, -2, -14, 8, 2, '#000');
+        if(atk) {
+            this.rect(ctx, 8, -2, 16, 4, '#fff');
+            this.rect(ctx, 6, -4, 4, 8, 'gold');
+        } else {
+            this.rect(ctx, -2, 2, 4, 12, '#999');
+        }
+        ctx.restore();
+    },
+    skel(ctx, x, y, dir) {
+        ctx.save(); ctx.translate(Math.floor(x+12), Math.floor(y+12)); ctx.scale(dir, 1);
+        this.rect(ctx, -5, -8, 10, 10, '#e0e0e0');
+        this.rect(ctx, -2, -6, 2, 2, '#000'); this.rect(ctx, 2, -6, 2, 2, '#000');
+        this.rect(ctx, -3, 2, 6, 8, '#e0e0e0');
+        ctx.restore();
+    },
+    door(ctx, x, y) {
+        this.rect(ctx, x, y-48, 40, 80, '#212121');
+        this.rect(ctx, x+4, y-44, 32, 72, '#311b92');
+    }
+};
+
+// --- ИГРОВОЙ ДВИЖОК ---
+const Game = {
+    cvs: null, ctx: null,
+    state: 'MENU',
+    stats: { hp: 100, max: 100, gold: 0, dmg: 2 },
+    level: 1,
+    p: { x:0, y:0, vx:0, vy:0, w:20, h:28, dir:1, atk:0, inv:0 },
+    keys: { l:false, r:false, u:false, a:false },
+    map: [], mobs: [], cam: 0,
+    physicsLocked: false, // ГЛАВНАЯ ЗАЩИТА
+
+    init() {
+        this.cvs = document.getElementById('cvs');
+        this.ctx = this.cvs.getContext('2d');
+
+        const resize = () => { this.cvs.width = window.innerWidth; this.cvs.height = window.innerHeight; };
+        window.addEventListener('resize', resize); resize();
+
+        // Загрузка
+        try {
+            const s = localStorage.getItem('eq_fix_v5');
+            if(s) {
+                const d = JSON.parse(s); this.level = d.level; this.stats = d.stats;
+                document.getElementById('save-msg').innerText = `СОХРАНЕНИЕ: УР. ${this.level}`;
+            }
+        } catch(e){}
+
+        this.initControls();
+        this.loop();
+    },
+
+    initControls() {
+        // Используем POINTER EVENTS (работает и на тач, и на мышь одинаково)
+        const keys = document.querySelectorAll('.key');
+
+        keys.forEach(el => {
+            const code = el.getAttribute('data-code');
+
+            // Нажатие
+            el.addEventListener('pointerdown', (e) => {
+                e.preventDefault(); // Блокируем стандартное поведение
+                if(this.physicsLocked) return; // Игнорируем ввод при старте
+                this.keys[code] = true;
+                el.classList.add('active');
+                // Захват указателя, чтобы не потерять нажатие при выходе за границы
+                el.setPointerCapture(e.pointerId);
+            });
+
+            // Отпускание
+            el.addEventListener('pointerup', (e) => {
+                e.preventDefault();
+                this.keys[code] = false;
+                el.classList.remove('active');
+                el.releasePointerCapture(e.pointerId);
+            });
+
+            // Отмена (если свайпнули совсем далеко или пришло системное окно)
+            el.addEventListener('pointercancel', (e) => {
+                this.keys[code] = false;
+                el.classList.remove('active');
+            });
+        });
+
+        // ГЛОБАЛЬНЫЙ СБРОС: Если отпустили палец ГДЕ УГОДНО
+        window.addEventListener('pointerup', () => {
+             // Сбрасываем "залипшие" клавиши, если они вдруг остались true
+             // Но делаем это аккуратно, чтобы не мешать мультитачу
+        });
+
+        // Сброс при потере фокуса окна
+        window.addEventListener('blur', () => this.resetKeys());
+    },
+
+    resetKeys() {
+        this.keys = { l:false, r:false, u:false, a:false };
+        document.querySelectorAll('.key').forEach(k => k.classList.remove('active'));
+    },
+
+    startSequence() {
+        // 1. Скрываем меню
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('shop').classList.add('hidden');
+        document.getElementById('controls').style.display = 'block';
+
+        // 2. СБРАСЫВАЕМ ВСЕ НАЖАТИЯ ПРИНУДИТЕЛЬНО
+        this.resetKeys();
+
+        // 3. БЛОКИРУЕМ ФИЗИКУ НА 0.5 СЕКУНДЫ
+        this.physicsLocked = true;
+        Log("PHYSICS LOCKED (Anti-Ghost)");
+
+        this.buildLevel();
+        this.state = 'PLAY';
+
+        setTimeout(() => {
+            this.physicsLocked = false;
+            this.resetKeys(); // Еще раз сбрасываем на всякий случай
+            Log("GO!");
+        }, 500);
+    },
+
+    buildLevel() {
+        const w = 40 + this.level*5;
+        this.map = [];
+        for(let x=0; x<w; x++) {
+            if(x>10 && x<w-10 && Math.random()>0.9) continue; 
+            this.map.push({x:x, y:12});
+            if(x>5 && x<w-5 && Math.random()>0.8) this.map.push({x:x, y:8});
+        }
+        for(let y=0; y<15; y++) { this.map.push({x:0, y:y}); this.map.push({x:w-1, y:y}); }
+
+        // Игрок спавнится и стоит
+        this.p = { x:100, y:100, vx:0, vy:0, w:20, h:28, dir:1, atk:0, inv:0 };
+        this.cam = 0;
+
+        this.mobs = [];
+        for(let i=0; i<this.level+2; i++) {
+            this.mobs.push({
+                x:(Math.random()*(w-10)+5)*32, y:0, w:24, h:24, hp:3, vx:0, vy:0, dir:1
+            });
+        }
+    },
+
+    update() {
+        if(this.state !== 'PLAY') return;
+        const p = this.p;
+
+        // ЕСЛИ ФИЗИКА ЗАБЛОКИРОВАНА (при старте) - СТОИМ
+        if(this.physicsLocked) {
+            p.vx = 0;
+            p.vy = 0;
+            // Показываем в логе, какие кнопки игра "видит" (для отладки)
+            Log(`WAIT... L:${this.keys.l?1:0} R:${this.keys.r?1:0}`);
+            return; 
+        } else {
+             Log(`PLAY. L:${this.keys.l?1:0} R:${this.keys.r?1:0}`);
+        }
+
+        // Управление
+        let move = false;
+        if(this.keys.l) { p.vx -= 1.5; p.dir = -1; move = true; }
+        if(this.keys.r) { p.vx += 1.5; p.dir = 1; move = true; }
+        if(this.keys.u && p.ground) { p.vy = -12; p.ground = false; }
+
+        // Трение (жесткое, если нет кнопок)
+        if(!move) p.vx *= 0.5; // Быстрая остановка
+        else p.vx *= 0.85;
+
+        // Лимит
+        p.vx = Math.max(-7, Math.min(7, p.vx));
+
+        p.vy += 0.8;
+
+        p.x += p.vx; this.col(p, 'x');
+        p.y += p.vy; p.ground = false; this.col(p, 'y');
+
+        if(p.y > 800) this.dead();
+
+        // Камера
+        let t = p.x - this.cvs.width/2;
+        this.cam += (t - this.cam) * 0.1;
+        if(this.cam < 0) this.cam = 0;
+
+        // Атака
+        if(this.keys.a && p.atk <= 0) {
+            p.atk = 15;
+            const hx = p.dir>0 ? p.x+p.w : p.x-40;
+            this.mobs.forEach(m => {
+                if(m.hp>0 && m.x>hx && m.x<hx+40 && Math.abs(m.y-p.y)<40) {
+                    m.hp-=this.stats.dmg; m.vx=p.dir*6; m.vy=-4;
+                    if(m.hp<=0) this.stats.gold+=15;
+                }
+            });
+        }
+        if(p.atk>0) p.atk--;
+        if(p.inv>0) p.inv--;
+
+        // Враги
+        this.mobs.forEach(m => {
+            if(m.hp<=0) return;
+            m.vy+=0.8;
+            if(Math.abs(p.x-m.x)<250) m.vx+=(p.x>m.x?0.3:-0.3);
+            m.vx*=0.9;
+            m.x+=m.vx; this.col(m, 'x');
+            m.y+=m.vy; this.col(m, 'y');
+
+            if(Math.abs(p.x-m.x)<20 && Math.abs(p.y-m.y)<20 && p.inv<=0) {
+                this.stats.hp-=10; p.inv=40; p.vy=-5; p.vx=-p.dir*5;
+                if(this.stats.hp<=0) this.dead();
+            }
+        });
+
+        // Победа
+        const endX = (this.map[this.map.length-1].x - 1) * 32;
+        if(p.x > endX) this.win();
+    },
+
+    col(o, ax) {
+        let l = Math.floor(o.x/32), r = Math.floor((o.x+o.w)/32);
+        let t = Math.floor(o.y/32), b = Math.floor((o.y+o.h)/32);
+        for(let m of this.map) {
+            if(m.x >= l && m.x <= r && m.y >= t && m.y <= b) {
+                if(ax === 'y') {
+                    if(o.vy > 0) { o.y = m.y*32 - o.h; o.ground = true; }
+                    else { o.y = (m.y+1)*32; }
+                    o.vy = 0;
+                } else {
+                    if(o.vx > 0) o.x = m.x*32 - o.w;
+                    else o.x = (m.x+1)*32;
+                    o.vx = 0;
+                }
+                return;
+            }
+        }
+    },
+
+    draw() {
+        const c = this.ctx;
+        c.fillStyle = '#120b18'; c.fillRect(0, 0, this.cvs.width, this.cvs.height);
+
+        c.save();
+        c.translate(-Math.floor(this.cam), 0);
+
+        for(let m of this.map) GFX.wall(c, m.x*32, m.y*32);
+
+        if(this.map.length > 0) {
+            const endX = (this.map[this.map.length-1].x - 1) * 32;
+            GFX.door(c, endX, 12*32);
+        }
+
+        this.mobs.forEach(m => { if(m.hp>0) GFX.skel(c, m.x, m.y, m.dir); });
+
+        if(this.state === 'PLAY' && this.p.inv%10 < 5) {
+            GFX.hero(c, this.p.x, this.p.y, this.p.dir, this.p.atk>0);
+        }
+
+        c.restore();
+
+        // UI
+        if(this.state === 'PLAY') {
+            c.fillStyle = '#222'; c.fillRect(10,10,140,40);
+            c.fillStyle = '#d32f2f'; c.fillRect(15,15, (this.stats.hp/this.stats.max)*130, 8);
+            c.fillStyle = '#fff'; c.font = '14px monospace';
+            c.fillText(`GOLD:${this.stats.gold} LVL:${this.level}`, 15, 40);
+        }
+    },
+
+    loop() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+    },
+
+    dead() {
+        this.state = 'DEAD';
+        document.getElementById('dead').classList.remove('hidden');
+        document.getElementById('controls').style.display = 'none';
+        try{ localStorage.removeItem('eq_fix_v5'); }catch(e){}
+    },
+
+    win() {
+        this.state = 'SHOP';
+        document.getElementById('ui-gold').innerText = this.stats.gold;
+        document.getElementById('shop').classList.remove('hidden');
+        document.getElementById('controls').style.display = 'none';
+        try{ localStorage.setItem('eq_fix_v5', JSON.stringify({level: this.level+1, stats: this.stats})); }catch(e){}
+    },
+
+    nextLevel() { this.level++; this.startSequence(); },
+
+    buy(t) {
+        if(t==='hp' && this.stats.gold>=50) { this.stats.gold-=50; this.stats.hp = Math.min(this.stats.hp+50, this.stats.max); }
+        if(t==='dmg' && this.stats.gold>=150) { this.stats.gold-=150; this.stats.dmg++; }
+        document.getElementById('ui-gold').innerText = this.stats.gold;
+    }
+};
+
+window.onload = () => Game.init();
+</script>
+</body>
+</html>
