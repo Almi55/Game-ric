@@ -3,124 +3,395 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Magnet Breaker Chaos</title>
+    <title>Bunker Chaos</title>
     <style>
-        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; touch-action: none; }
+        body { margin: 0; background: #050505; overflow: hidden; font-family: 'Courier New', monospace; touch-action: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
-        #ui {
-            position: absolute; top: 20px; left: 0; width: 100%;
-            text-align: center; pointer-events: none;
-            color: #fff; text-transform: uppercase;
-            text-shadow: 0 0 10px #000;
-        }
-        #score { font-size: 40px; font-weight: 900; letter-spacing: 2px; }
-        #hint { font-size: 14px; opacity: 0.7; margin-top: 10px; color: #0f0; }
 
-        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
+        #ui {
+            position: absolute; top: 20px; width: 100%;
+            text-align: center; pointer-events: none;
+            color: #fff; text-shadow: 0 0 10px #000;
+            z-index: 10;
+        }
+        .level-title { font-size: 24px; font-weight: bold; color: #00ff00; margin-bottom: 5px; }
+        .hint { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Анимация победы */
+        #flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #fff; pointer-events: none; opacity: 0; transition: opacity 0.1s;
         }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div id="score">0</div>
-    <div id="hint">ЗАЖМИ ЧТОБЫ ПРИТЯНУТЬ <br> ОТПУСТИ ЧТОБЫ ВЫСТРЕЛИТЬ</div>
+    <div class="level-title" id="level-display">LEVEL 1</div>
+    <div class="hint">Удерживай для прицела • Отпусти для выстрела</div>
 </div>
+<div id="flash"></div>
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-// --- НАСТРОЙКИ ---
 let W, H;
-let score = 0;
-let balls = [];
 let particles = [];
+let balls = [];
 let blocks = [];
-let buffs = [];
+let level = 1;
+
+// Настройки игры
+const CFG = {
+    cols: 14,          // Блоки стали меньше (было 8)
+    rows: 10,          // Высота бункера
+    maxBalls: 300,     // Лимит, чтобы телефон не взорвался
+    magnetPower: 0.15, // Сила магнита
+    friction: 0.99     // Мячи почти не теряют скорость
+};
+
+const paddle = { x: 0, y: 0, w: 100, h: 15, color: '#00ff00' };
 let magnetActive = false;
 let shakeTime = 0;
 
-// Платформа
-const paddle = {
-    x: 0, y: 0, w: 120, h: 20,
-    color: '#00ffff',
-    capturedBalls: [] // Мячи, которые прилипли
-};
-
-// Цвета для неона
-const COLORS = ['#ff0055', '#00ff55', '#0055ff', '#ffff00', '#ff00ff'];
-
-// --- ИНИЦИАЛИЗАЦИЯ ---
+// --- СИСТЕМА УРОВНЕЙ ---
 function resize() {
     W = canvas.width = window.innerWidth;
     H = canvas.height = window.innerHeight;
-    paddle.y = H - 100;
-    paddle.x = W / 2 - paddle.w / 2;
-    initLevel();
+    paddle.y = H - 80;
+    paddle.x = W/2 - paddle.w/2;
+    if(blocks.length === 0) generateLevel();
 }
 window.addEventListener('resize', resize);
 
-function initLevel() {
+function generateLevel() {
     blocks = [];
-    const cols = 8;
-    const rows = 6;
-    const padding = 10;
-    const blockW = (W - padding * 2) / cols - padding;
-    const blockH = 30;
+    balls = [];
 
-    for(let r=0; r<rows; r++) {
-        for(let c=0; c<cols; c++) {
+    // Спавним один мяч на старте
+    spawnBall(W/2, H - 200, 0, 0);
+    balls[0].stuck = true; // Сразу на магните
+
+    // Параметры сетки
+    const padding = 2;
+    const blockW = W / CFG.cols;
+    const blockH = blockW * 0.6; // Пропорции кирпича
+    const startY = 80;
+
+    // ГЕНЕРАТОР КОРОБКИ
+    // Мы строим стены из "Бетона" (type: 2), а внутри "Стекло" (type: 1) и "Вирусы" (type: 3)
+
+    // Позиция "Люка" (входа) - меняется каждый уровень
+    // Люк всегда где-то по центру, шириной в 2 блока
+    let gateX = Math.floor(CFG.cols / 2) + Math.floor((Math.random() - 0.5) * 4); 
+
+    for (let r = 0; r < CFG.rows; r++) {
+        for (let c = 0; c < CFG.cols; c++) {
+            let type = 1; // Обычный разрушаемый блок
+            let color = `hsl(${c * 10 + r * 10 + level * 20}, 70%, 50%)`;
+
+            // 1. Границы (Стены и Потолок)
+            if (r === 0 || c === 0 || c === CFG.cols - 1) {
+                type = 2; // БЕТОН
+            }
+
+            // 2. Пол бункера (с дыркой)
+            if (r === CFG.rows - 1) {
+                if (c === gateX || c === gateX + 1) {
+                    continue; // Дырка (не ставим блок)
+                } else {
+                    type = 2; // БЕТОН
+                }
+            }
+
+            // 3. Внутренние перегородки (Лабиринт)
+            // Шанс 10% поставить бетонный блок внутри, чтобы усложнить рикошеты
+            if (type === 1 && r > 2 && r < CFG.rows - 2 && Math.random() < 0.1) {
+                type = 2; 
+            }
+
+            // 4. Вирус-блоки (Множители)
+            // Ставим их внутри. Попадание = +2 мяча.
+            if (type === 1 && Math.random() < 0.15) {
+                type = 3; 
+            }
+
+            // Создаем блок
             blocks.push({
-                x: padding + c * (blockW + padding),
-                y: 80 + r * (blockH + padding),
-                w: blockW, h: blockH,
-                color: COLORS[r % COLORS.length],
-                active: true,
-                hp: 1 // Можно сделать прочные блоки
+                x: c * blockW + padding,
+                y: startY + r * blockH + padding,
+                w: blockW - padding*2,
+                h: blockH - padding*2,
+                type: type, // 1=Break, 2=Solid, 3=Virus
+                color: (type === 2) ? '#444' : (type === 3) ? '#fff' : color,
+                hp: (type === 2) ? 9999 : 1
             });
         }
     }
 
-    // Стартовый мяч
-    if(balls.length === 0) spawnBall(W/2, H/2);
+    document.getElementById('level-display').innerText = `LEVEL ${level}`;
 }
 
+// --- ФИЗИКА ---
 function spawnBall(x, y, vx, vy) {
+    if (balls.length >= CFG.maxBalls) return;
     balls.push({
         x: x, y: y,
-        vx: vx || (Math.random() - 0.5) * 8,
-        vy: vy || -8,
-        r: 8,
+        vx: vx, vy: vy,
+        r: 4, // Маленькие мячи
         color: '#fff',
-        trail: [],
-        stuck: false // Прилип ли к платформе
+        stuck: false
     });
 }
 
-// --- УПРАВЛЕНИЕ ---
-function inputStart(e) {
-    magnetActive = true;
-    e.preventDefault();
+function explodeBlock(b, idx) {
+    // Эффекты
+    for(let i=0; i<5; i++) {
+        particles.push({
+            x: b.x + b.w/2, y: b.y + b.h/2,
+            vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+            life: 1.0, color: b.color
+        });
+    }
+
+    // Логика типа блока
+    if (b.type === 3) { // ВИРУС
+        // Спавним мячи прямо тут
+        spawnBall(b.x + b.w/2, b.y + b.h/2, 5, -5);
+        spawnBall(b.x + b.w/2, b.y + b.h/2, -5, -5);
+        shakeTime = 5;
+    }
+
+    blocks.splice(idx, 1); // Удаляем блок
+
+    // Проверка победы (если не осталось разрушаемых блоков типа 1 или 3)
+    let left = blocks.filter(x => x.type === 1 || x.type === 3).length;
+    if (left === 0) {
+        nextLevel();
+    }
 }
 
+function nextLevel() {
+    level++;
+    // Вспышка
+    const flash = document.getElementById('flash');
+    flash.style.opacity = 1;
+    setTimeout(() => flash.style.opacity = 0, 200);
+    generateLevel();
+}
+
+// --- LOOP ---
+function update() {
+    // 1. Управление платформой
+    if (magnetActive) {
+        // Плавное следование за мышкой, но с задержкой (вес)
+        // paddle.x обновляется в обработчике событий
+    }
+
+    // 2. Мячи
+    for (let i = balls.length - 1; i >= 0; i--) {
+        let b = balls[i];
+
+        if (b.stuck) {
+            b.x += (paddle.x + paddle.w/2 - b.x) * 0.2;
+            b.y = paddle.y - 10;
+            continue;
+        }
+
+        // Магнитное притягивание (только если мяч СНИЗУ от блоков)
+        // Чтобы нельзя было вытянуть мячи из лабиринта случайно
+        if (magnetActive && b.y > H * 0.6) {
+            let dx = (paddle.x + paddle.w/2) - b.x;
+            let dy = paddle.y - b.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 300) {
+                b.vx += dx * 0.02;
+                b.vy += dy * 0.02;
+            }
+        }
+
+        // Физика
+        b.x += b.vx;
+        b.y += b.vy;
+
+        // Ограничение скорости (чтобы не пролетали сквозь стены)
+        let speed = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+        if (speed > 12) { b.vx *= 0.9; b.vy *= 0.9; }
+        if (speed < 4 && b.y < H/2) { b.vx *= 1.01; b.vy *= 1.01; } // Не даем застрять
+
+        // Стены экрана
+        if (b.x < 0 || b.x > W) b.vx *= -1;
+        if (b.y < 0) b.vy *= -1;
+
+        // Смерть мяча
+        if (b.y > H) {
+            balls.splice(i, 1);
+            if (balls.length === 0) {
+                // Если все умерли - рестарт уровня (но не полный сброс)
+                spawnBall(paddle.x + paddle.w/2, paddle.y - 20, 0, 0);
+                balls[0].stuck = true;
+            }
+            continue;
+        }
+
+        // Коллизия с Платформой
+        if (b.y + b.r >= paddle.y && b.y - b.r <= paddle.y + paddle.h &&
+            b.x >= paddle.x && b.x <= paddle.x + paddle.w) {
+
+            if (magnetActive) {
+                b.stuck = true;
+                b.vx = 0; b.vy = 0;
+            } else {
+                b.vy = -Math.abs(b.vy);
+                b.vx += (b.x - (paddle.x + paddle.w/2)) * 0.3; // Управление углом
+                b.y = paddle.y - b.r - 2;
+            }
+        }
+
+        // Коллизия с Блоками
+        // Оптимизация: проверяем только ближайшие
+        for (let j = blocks.length - 1; j >= 0; j--) {
+            let blk = blocks[j];
+
+            // AABB Collision
+            if (b.x > blk.x && b.x < blk.x + blk.w &&
+                b.y > blk.y && b.y < blk.y + blk.h) {
+
+                // Простейший отскок (инвертируем и то и то для надежности внутри блоков)
+                // Более точный: определить с какой стороны вошел
+                let overlapX = (Math.min(b.x + b.r, blk.x + blk.w) - Math.max(b.x - b.r, blk.x));
+                let overlapY = (Math.min(b.y + b.r, blk.y + blk.h) - Math.max(b.y - b.r, blk.y));
+
+                if (overlapX < overlapY) {
+                    b.vx *= -1;
+                    // Выталкиваем
+                    if (b.x < blk.x + blk.w/2) b.x = blk.x - b.r; else b.x = blk.x + blk.w + b.r;
+                } else {
+                    b.vy *= -1;
+                    if (b.y < blk.y + blk.h/2) b.y = blk.y - b.r; else b.y = blk.y + blk.h + b.r;
+                }
+
+                // Логика разрушения
+                if (blk.type === 2) {
+                    // БЕТОН - Не ломается, но чуть трясет экран при сильном ударе
+                    if (speed > 10) shakeTime = 2;
+                } else {
+                    explodeBlock(blk, j);
+                }
+                break; // Только 1 блок за кадр
+            }
+        }
+    }
+
+    // Частицы
+    for(let i=particles.length-1; i>=0; i--) {
+        let p = particles[i];
+        p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+        if(p.life <= 0) particles.splice(i,1);
+    }
+}
+
+function draw() {
+    // Тряска
+    let dx = 0, dy = 0;
+    if (shakeTime > 0) {
+        shakeTime--;
+        dx = (Math.random()-0.5)*5;
+        dy = (Math.random()-0.5)*5;
+    }
+
+    ctx.setTransform(1, 0, 0, 1, dx, dy);
+
+    // Очистка
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(-10, -10, W+20, H+20);
+
+    // Блоки
+    blocks.forEach(b => {
+        ctx.fillStyle = b.color;
+
+        if (b.type === 2) { // БЕТОН
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(b.x, b.y, b.w, b.h);
+            ctx.fillStyle = '#333';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            // Заклепки на бетоне
+            ctx.fillStyle = '#111';
+            ctx.fillRect(b.x+2, b.y+2, 4, 4);
+            ctx.fillRect(b.x+b.w-6, b.y+b.h-6, 4, 4);
+        } 
+        else if (b.type === 3) { // ВИРУС
+            ctx.fillStyle = '#fff';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#fff';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.shadowBlur = 0;
+            // Крестик
+            ctx.fillStyle = '#f00';
+            ctx.font = "bold 14px Arial";
+            ctx.fillText("+", b.x + b.w/2 - 4, b.y + b.h/2 + 5);
+        }
+        else { // ОБЫЧНЫЙ
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = b.color;
+            ctx.fillRect(b.x+1, b.y+1, b.w-2, b.h-2);
+            ctx.shadowBlur = 0;
+        }
+    });
+
+    // Платформа
+    ctx.fillStyle = magnetActive ? '#fff' : paddle.color;
+    ctx.shadowBlur = magnetActive ? 20 : 5;
+    ctx.shadowColor = paddle.color;
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+
+    // Луч прицеливания (если мяч прилип)
+    if (balls.some(b => b.stuck) && magnetActive) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.beginPath();
+        ctx.moveTo(paddle.x + paddle.w/2, paddle.y);
+        ctx.lineTo(paddle.x + paddle.w/2, 0);
+        ctx.stroke();
+    }
+
+    // Мячи
+    ctx.fillStyle = '#fff';
+    balls.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+        ctx.fill();
+    });
+
+    // Частицы
+    particles.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.fillRect(p.x, p.y, 3, 3);
+    });
+    ctx.globalAlpha = 1;
+}
+
+// --- УПРАВЛЕНИЕ ---
+function inputStart(e) { magnetActive = true; e.preventDefault(); }
 function inputEnd(e) {
     magnetActive = false;
-    releaseBalls();
-    e.preventDefault();
+    // Выстрел
+    balls.forEach(b => {
+        if(b.stuck) {
+            b.stuck = false;
+            // Стреляем строго вверх с легким разбросом, чтобы попасть в люк
+            let angle = -Math.PI/2 + (Math.random() - 0.5) * 0.1; 
+            b.vx = Math.cos(angle) * 12; // Скорость выстрела
+            b.vy = Math.sin(angle) * 12;
+        }
+    });
 }
-
 function inputMove(e) {
     let clientX = e.touches ? e.touches[0].clientX : e.clientX;
     paddle.x = clientX - paddle.w / 2;
-
-    // Ограничение краев
     if(paddle.x < 0) paddle.x = 0;
     if(paddle.x + paddle.w > W) paddle.x = W - paddle.w;
 }
@@ -128,282 +399,18 @@ function inputMove(e) {
 canvas.addEventListener('mousedown', inputStart);
 canvas.addEventListener('mouseup', inputEnd);
 canvas.addEventListener('mousemove', inputMove);
-
 canvas.addEventListener('touchstart', inputStart, {passive: false});
 canvas.addEventListener('touchend', inputEnd, {passive: false});
 canvas.addEventListener('touchmove', inputMove, {passive: false});
 
-// --- ЛОГИКА ---
-function releaseBalls() {
-    // Выстреливаем "дробовиком"
-    // Чем больше мячей накопили, тем быстрее они летят
-    let power = 10 + Math.min(balls.length, 10); 
-
-    balls.forEach(b => {
-        if(b.stuck) {
-            b.stuck = false;
-            // Случайный разброс вверх
-            let angle = -Math.PI/2 + (Math.random() - 0.5) * 1.0; // Конус 60 градусов
-            b.vx = Math.cos(angle) * power;
-            b.vy = Math.sin(angle) * power;
-        }
-    });
-}
-
-function createExplosion(x, y, color) {
-    // Тряска экрана
-    shakeTime = 10;
-
-    for(let i=0; i<15; i++) {
-        particles.push({
-            x: x, y: y,
-            vx: (Math.random() - 0.5) * 10,
-            vy: (Math.random() - 0.5) * 10,
-            life: 1.0,
-            color: color
-        });
-    }
-}
-
-function spawnBuff(x, y) {
-    // 20% шанс выпадения баффа
-    if(Math.random() > 0.2) return;
-
-    const types = ['SPLIT', 'BIG'];
-    const type = types[Math.floor(Math.random() * types.length)];
-
-    buffs.push({
-        x: x, y: y, w: 20, h: 20,
-        type: type,
-        vy: 3
-    });
-}
-
-function applyBuff(type) {
-    if(type === 'SPLIT') {
-        // Умножаем мячи!
-        let currentCount = balls.length;
-        if (currentCount < 100) { // Ограничитель, чтобы браузер не умер
-            for(let i=0; i<currentCount; i++) {
-                let b = balls[i];
-                spawnBall(b.x, b.y, -b.vx, b.vy); // Копия в другую сторону
-            }
-        }
-        document.getElementById('hint').innerText = "MULTIBALL CHAOS!";
-        setTimeout(() => document.getElementById('hint').innerText = "", 1000);
-    } 
-    else if (type === 'BIG') {
-        paddle.w += 20;
-    }
-}
-
-function update() {
-    // Тряска экрана
-    let shakeX = 0, shakeY = 0;
-    if(shakeTime > 0) {
-        shakeTime--;
-        shakeX = (Math.random() - 0.5) * 10;
-        shakeY = (Math.random() - 0.5) * 10;
-    }
-
-    // Блоки
-    let activeBlocks = 0;
-    blocks.forEach(b => {
-        if(b.active) activeBlocks++;
-    });
-    if(activeBlocks === 0) initLevel(); // Рестарт уровня
-
-    // Мячи
-    for(let i = balls.length - 1; i >= 0; i--) {
-        let b = balls[i];
-
-        // 1. Логика Магнита
-        if (b.stuck) {
-            // Если прилип, двигается вместе с платформой
-            // Слегка стягиваем их к центру платформы
-            let targetX = paddle.x + paddle.w/2;
-            b.x += (targetX - b.x) * 0.1;
-            b.y = paddle.y - b.r;
-            continue; // Пропускаем физику
-        }
-
-        if (magnetActive) {
-            // Если магнит включен и мяч близко -> притягиваем
-            let dx = (paddle.x + paddle.w/2) - b.x;
-            let dy = paddle.y - b.y;
-            let dist = Math.sqrt(dx*dx + dy*dy);
-
-            if (dist < 250 && b.y < paddle.y) { // Радиус действия 250px
-                b.vx += dx * 0.005;
-                b.vy += dy * 0.005;
-                b.color = '#00ffff'; // Синеет под магнитом
-            } else {
-                b.color = '#fff';
-            }
-        }
-
-        // 2. Движение
-        b.x += b.vx;
-        b.y += b.vy;
-
-        // Шлейф
-        b.trail.push({x: b.x, y: b.y});
-        if(b.trail.length > 10) b.trail.shift();
-
-        // 3. Стены
-        if(b.x < 0 || b.x > W) { b.vx *= -1; b.x = b.x < 0 ? 0 : W; }
-        if(b.y < 0) { b.vy *= -1; b.y = 0; }
-
-        // Дно (Смерть мяча)
-        if(b.y > H) {
-            balls.splice(i, 1);
-            if(balls.length === 0) {
-                score = 0; document.getElementById('score').innerText = score;
-                spawnBall(W/2, H/2); // Респаун
-            }
-            continue;
-        }
-
-        // 4. Коллизия с Платформой
-        if(b.y + b.r >= paddle.y && b.y - b.r <= paddle.y + paddle.h &&
-           b.x >= paddle.x && b.x <= paddle.x + paddle.w) {
-
-            if(magnetActive) {
-                b.stuck = true;
-                b.vx = 0; b.vy = 0;
-            } else {
-                // Обычный отскок
-                b.vy = -Math.abs(b.vy);
-                // Добавляем скорость платформы
-                let hitPoint = (b.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
-                b.vx += hitPoint * 5; 
-                // Ускоряем мяч немного
-                b.vx *= 1.05; b.vy *= 1.05;
-            }
-        }
-
-        // 5. Коллизия с Блоками
-        blocks.forEach(block => {
-            if(!block.active) return;
-
-            if(b.x > block.x && b.x < block.x + block.w &&
-               b.y > block.y && b.y < block.y + block.h) {
-
-                block.active = false;
-                b.vy *= -1;
-                score += 10;
-                document.getElementById('score').innerText = score;
-
-                createExplosion(block.x + block.w/2, block.y + block.h/2, block.color);
-                spawnBuff(block.x + block.w/2, block.y + block.h/2);
-            }
-        });
-    }
-
-    // Баффы
-    for(let i = buffs.length - 1; i >= 0; i--) {
-        let f = buffs[i];
-        f.y += f.vy;
-
-        // Поймали бафф
-        if(f.y + f.h >= paddle.y && f.x >= paddle.x && f.x <= paddle.x + paddle.w) {
-            applyBuff(f.type);
-            buffs.splice(i, 1);
-        } else if (f.y > H) {
-            buffs.splice(i, 1);
-        }
-    }
-
-    // Частицы
-    for(let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.05;
-        if(p.life <= 0) particles.splice(i, 1);
-    }
-
-    return {x: shakeX, y: shakeY};
-}
-
-function draw(shake) {
-    ctx.save();
-    ctx.translate(shake.x, shake.y); // Тряска
-
-    // Очистка с блюром для шлейфов
-    ctx.fillStyle = 'rgba(17, 17, 17, 0.3)';
-    ctx.fillRect(-10, -10, W+20, H+20);
-
-    // Блоки
-    blocks.forEach(b => {
-        if(!b.active) return;
-        ctx.fillStyle = b.color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = b.color;
-        ctx.fillRect(b.x, b.y, b.w-2, b.h-2);
-        ctx.shadowBlur = 0;
-    });
-
-    // Платформа
-    ctx.fillStyle = magnetActive ? '#fff' : paddle.color;
-    ctx.shadowBlur = magnetActive ? 20 : 0;
-    ctx.shadowColor = '#00ffff';
-    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
-
-    // Эффект магнита (линии)
-    if(magnetActive) {
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(paddle.x + paddle.w/2, paddle.y, 250, Math.PI, 0); // Дуга радиуса
-        ctx.stroke();
-    }
-
-    // Мячи
-    balls.forEach(b => {
-        // Шлейф
-        if(b.trail.length > 0) {
-            ctx.beginPath();
-            ctx.strokeStyle = b.color;
-            ctx.lineWidth = 2;
-            ctx.moveTo(b.trail[0].x, b.trail[0].y);
-            for(let t of b.trail) ctx.lineTo(t.x, t.y);
-            ctx.stroke();
-        }
-
-        ctx.fillStyle = b.color;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-        ctx.fill();
-    });
-
-    // Баффы
-    buffs.forEach(f => {
-        ctx.fillStyle = f.type === 'SPLIT' ? '#ff00ff' : '#00ff00';
-        ctx.font = "20px sans-serif";
-        ctx.fillText(f.type === 'SPLIT' ? '✖' : '▲', f.x, f.y);
-    });
-
-    // Частицы
-    particles.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.fillRect(p.x, p.y, 4, 4);
-        ctx.globalAlpha = 1;
-    });
-
-    ctx.restore();
-}
-
 function loop() {
-    let shake = update();
-    draw(shake);
+    update();
+    draw();
     requestAnimationFrame(loop);
 }
 
 resize();
 loop();
-
 </script>
 </body>
 </html>
