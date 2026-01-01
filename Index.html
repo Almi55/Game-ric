@@ -3,225 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ETERNA-QUEST: Ruin Legends</title>
+    <title>ETERNA-QUEST: Fixed</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-        :root {
-            --gold: #ffb300;
-            --dark-ui: #151515;
-            --border: #5d4037;
-        }
-
         body {
             margin: 0;
-            background-color: #050505;
+            background-color: #000;
             overflow: hidden;
-            font-family: 'Press Start 2P', cursive;
+            font-family: 'Press Start 2P', monospace;
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
 
         #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
             background: #111;
         }
 
         canvas {
-            image-rendering: pixelated; /* Жесткие пиксели */
-            width: 100%;
-            height: 100%;
-        }
-
-        /* --- ИНТЕРФЕЙС (HUD) --- */
-        .ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        /* Верхняя панель */
-        #hud-top {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            box-sizing: border-box;
-            width: 100%;
-        }
-
-        .hud-group {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-        }
-
-        .portrait-box {
-            width: 50px;
-            height: 50px;
-            border: 3px solid var(--gold);
-            background: #222;
+            display: block;
             image-rendering: pixelated;
         }
 
-        .bars {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            margin-top: 5px;
-        }
-
-        .bar-con {
-            width: 150px;
-            height: 14px;
-            background: #333;
-            border: 2px solid #000;
-            position: relative;
-        }
-
-        .bar-fill { height: 100%; width: 100%; transition: width 0.2s; }
-        .hp-fill { background: #d32f2f; }
-        .mp-fill { background: #1976d2; }
-
-        .level-box {
-            border: 3px solid var(--gold);
-            background: rgba(0,0,0,0.8);
-            padding: 10px;
-            text-align: center;
-            color: var(--gold);
-            font-size: 12px;
-            min-width: 80px;
-            margin-top: -5px; /* Чуть выше */
-        }
-
-        .minimap-box {
-            width: 100px;
-            height: 60px;
-            border: 3px solid var(--gold);
-            background: #000;
-            opacity: 0.8;
-            margin-right: 10px;
-        }
-
-        /* Правые слоты */
-        #hud-right {
+        /* ИНТЕРФЕЙС */
+        .ui-layer {
             position: absolute;
-            right: 10px;
-            top: 100px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .item-slot {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--gold);
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #fff;
-            font-size: 10px;
-            position: relative;
-        }
-        .item-count {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            font-size: 8px;
-        }
-
-        /* Меню (Привал / Старт) */
-        .menu-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            pointer-events: auto;
-            z-index: 20;
-            display: none;
-        }
-
-        .menu-box {
-            background: #2e2724;
-            border: 4px solid var(--gold);
-            padding: 20px;
-            text-align: center;
-            color: #fff;
-            box-shadow: 0 0 20px #000;
-            width: 300px;
-        }
-
-        .btn {
-            background: #5d4037;
-            border: 2px solid #8d6e63;
-            color: var(--gold);
-            padding: 15px;
-            width: 100%;
-            margin: 10px 0;
-            font-family: inherit;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
-        .btn:active { background: #3e2723; transform: scale(0.98); }
-
-        /* УПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНА */
-        #mobile-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            height: 120px;
-            padding: 0 30px;
-            padding-bottom: env(safe-area-inset-bottom); /* Фикс для iPhone/Tablet */
-            box-sizing: border-box;
-            display: none; /* JS включит */
-            justify-content: space-between;
-            align-items: flex-end;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
             z-index: 10;
         }
 
-        .ctrl-btn {
-            width: 64px;
-            height: 64px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
-            pointer-events: auto;
+        /* HUD */
+        .hud-panel {
             display: flex;
-            justify-content: center;
-            align-items: center;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .portrait {
+            width: 48px; height: 48px;
+            background: #3e2723;
+            border: 2px solid #ffd700;
+            display: flex; align-items: center; justify-content: center;
             font-size: 24px;
-            backdrop-filter: blur(4px);
-            color: #eee;
         }
-        .ctrl-btn:active { background: rgba(255,215,0, 0.3); border-color: var(--gold); }
 
-        .d-pad { display: flex; gap: 15px; }
-        .actions { display: flex; gap: 15px; }
-        .btn-atk { background: rgba(200, 50, 50, 0.2); border-color: #ef5350; width: 70px; height: 70px; }
+        .bars { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; max-width: 200px; }
+        .bar-bg { width: 100%; height: 12px; background: #222; border: 2px solid #000; }
+        .bar-fill { height: 100%; transition: width 0.1s; }
+        .hp { background: #d32f2f; }
 
-        /* Золото счетчик */
-        #gold-display {
+        .stats { color: #ffd700; font-size: 10px; margin-top: 5px; text-shadow: 1px 1px 0 #000; }
+
+        /* МЕНЮ */
+        .menu-overlay {
             position: absolute;
-            top: 70px;
-            left: 10px;
-            color: var(--gold);
-            font-size: 14px;
-            text-shadow: 2px 2px 0 #000;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 20;
+            pointer-events: auto;
         }
+
+        .menu-box {
+            background: #2d2d2d;
+            border: 4px solid #ffd700;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            width: 300px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        .btn {
+            background: #5d4037;
+            color: #ffd700;
+            border: 2px solid #3e2723;
+            padding: 15px;
+            width: 100%;
+            margin-top: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .btn:active { transform: scale(0.98); background: #4e342e; }
+
+        /* СЕНСОРНОЕ УПРАВЛЕНИЕ */
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px; left: 0;
+            width: 100%;
+            height: 140px;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: none; /* JS включит */
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 15;
+            pointer-events: none; /* Пропускаем клики сквозь пустоту */
+        }
+
+        .control-group { pointer-events: auto; display: flex; gap: 15px; }
+
+        .t-btn {
+            width: 70px; height: 70px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px;
+            color: rgba(255,255,255,0.7);
+            user-select: none;
+        }
+        .t-btn:active { background: rgba(255,215,0,0.3); border-color: #ffd700; color: #fff; }
+        .btn-atk { width: 80px; height: 80px; border-radius: 15px; background: rgba(200,50,50,0.2); border-color: #ef5350; }
 
     </style>
 </head>
@@ -230,509 +134,364 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
-    <!-- ИНТЕРФЕЙС -->
-    <div id="ui-layer" class="ui-layer">
-
-        <div id="hud-top">
-            <div class="hud-group">
-                <canvas id="portrait-canvas" width="50" height="50" class="portrait-box"></canvas>
-                <div class="bars">
-                    <div class="bar-con"><div id="hp-bar" class="bar-fill hp-fill"></div></div>
-                    <div class="bar-con"><div id="mp-bar" class="bar-fill mp-fill"></div></div>
+    <div class="ui-layer">
+        <div class="hud-panel">
+            <div class="portrait">🛡️</div>
+            <div class="bars">
+                <div class="bar-bg"><div id="hp-bar" class="bar-fill hp" style="width: 100%;"></div></div>
+                <div class="stats">
+                    LVL <span id="ui-lvl">1</span> | 💰 <span id="ui-gold">0</span>
                 </div>
             </div>
-
-            <div class="level-box">
-                LEVEL<br><span id="level-display" style="font-size:18px; display:block; margin-top:5px;">1</span>
-            </div>
-
-            <canvas id="minimap" width="100" height="60" class="minimap-box"></canvas>
-        </div>
-
-        <div id="gold-display">💰 0</div>
-
-        <div id="hud-right">
-            <div class="item-slot">⚔️<span class="item-count">1</span></div>
-            <div class="item-slot">🛡️<span class="item-count">1</span></div>
-            <div class="item-slot">🧪<span class="item-count">3</span></div>
         </div>
     </div>
 
-    <!-- МЕНЮ -->
-    <div id="main-menu" class="menu-overlay" style="display: flex;">
+    <!-- ГЛАВНОЕ МЕНЮ -->
+    <div id="main-menu" class="menu-overlay">
         <div class="menu-box">
-            <h1 style="color:var(--gold); text-shadow:2px 2px 0 #000;">ETERNA QUEST</h1>
-            <p style="font-size:10px; color:#aaa; margin-bottom:20px;">THE ENDLESS RUINS</p>
-            <button id="btn-continue" class="btn" style="display:none;" onclick="Game.loadGame()">ПРОДОЛЖИТЬ</button>
-            <button class="btn" onclick="Game.newGame()">НОВАЯ ИГРА</button>
+            <h1 style="color:#ffd700; margin:0 0 10px 0;">ETERNA QUEST</h1>
+            <p style="font-size:10px; color:#aaa;">PIXEL DUNGEON CRAWLER</p>
+            <button class="btn" onclick="Game.startNewGame()">НОВАЯ ИГРА</button>
         </div>
     </div>
 
-    <div id="rest-menu" class="menu-overlay">
+    <!-- МЕНЮ ПРИВАЛА -->
+    <div id="rest-menu" class="menu-overlay" style="display:none;">
         <div class="menu-box">
-            <h2>ПРИВАЛ</h2>
-            <p>Уровень зачищен!</p>
-            <p style="color:var(--gold)">Ваше золото: <span id="rest-gold">0</span></p>
-            <hr style="border-color:#555; margin: 15px 0;">
+            <h2>УРОВЕНЬ ЗАЧИЩЕН</h2>
+            <p>Золото: <span id="rest-gold" style="color:#ffd700">0</span></p>
+            <hr style="border-color:#444; margin: 15px 0;">
             <button class="btn" onclick="Game.buyHeal()">ЛЕЧЕНИЕ (50$)</button>
-            <button class="btn" onclick="Game.buyUpgrade()">ЗАТОЧКА (+DMG) (100$)</button>
-            <button class="btn" style="background:var(--gold); color:#000;" onclick="Game.nextLevel()">ДАЛЕЕ ➡</button>
+            <button class="btn" onclick="Game.buyDmg()">УРОН + (100$)</button>
+            <button class="btn" style="background:#2e7d32; color:#fff;" onclick="Game.nextLevel()">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
         </div>
     </div>
 
-    <div id="game-over" class="menu-overlay">
+    <!-- МЕНЮ СМЕРТИ -->
+    <div id="death-menu" class="menu-overlay" style="display:none;">
         <div class="menu-box" style="border-color:#d32f2f;">
-            <h2 style="color:#d32f2f;">YOU DIED</h2>
-            <p>Ваши кости останутся здесь...</p>
+            <h2 style="color:#d32f2f">ВЫ ПОГИБЛИ</h2>
             <button class="btn" onclick="location.reload()">В МЕНЮ</button>
         </div>
     </div>
 
-    <!-- УПРАВЛЕНИЕ -->
+    <!-- СЕНСОРЫ -->
     <div id="mobile-controls">
-        <div class="d-pad">
-            <div class="ctrl-btn" id="btn-left">⬅️</div>
-            <div class="ctrl-btn" id="btn-right">➡️</div>
+        <div class="control-group">
+            <div class="t-btn" id="btn-l">⬅️</div>
+            <div class="t-btn" id="btn-r">➡️</div>
         </div>
-        <div class="actions">
-            <div class="ctrl-btn btn-atk" id="btn-attack">⚔️</div>
-            <div class="ctrl-btn" id="btn-jump">⬆️</div>
+        <div class="control-group">
+            <div class="t-btn btn-atk" id="btn-atk">⚔️</div>
+            <div class="t-btn" id="btn-j">⬆️</div>
         </div>
     </div>
 </div>
 
 <script>
-/**
- * ETERNA-QUEST: Engine 2.0
- * Pixel Art Procedural Generation
- */
-
-// --- КОНСТАНТЫ ---
-const TILE = 40; // Размер клетки (крупнее для пиксель-арта)
-const GRAVITY = 0.8;
-const JUMP_POWER = 14;
-const SPEED = 6;
-
-// Цвета для генерации спрайтов
-const C = {
-    brick: '#5d4037', brickD: '#3e2723', brickL: '#8d6e63',
-    bg: '#1a1a1d', col: '#121215',
-    sky: '#0d0d12',
-    gold: '#ffd700',
-    blood: '#b71c1c'
-};
-
+/* --- ДВИЖОК --- */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// Настройки
+const TILE = 40;
+const GRAVITY = 0.8;
+const SPEED = 6;
+const JUMP = 15;
+
+// Состояние
 let W, H;
-
-// Настройка Canvas
-function resize() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    canvas.width = W;
-    canvas.height = H;
-    ctx.imageSmoothingEnabled = false;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// --- УПРАВЛЕНИЕ ---
 const keys = { l: false, r: false, u: false, atk: false };
-const bind = (k, v) => {
-    if(k==='ArrowLeft'||k==='KeyA') keys.l=v;
-    if(k==='ArrowRight'||k==='KeyD') keys.r=v;
-    if(k==='ArrowUp'||k==='Space') keys.u=v;
-    if(k==='KeyZ'||k==='KeyK') keys.atk=v;
-};
-window.onkeydown = e => bind(e.code, true);
-window.onkeyup = e => bind(e.code, false);
 
-// Сенсор
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-    document.getElementById('mobile-controls').style.display = 'flex';
-    const tBind = (id, k) => {
-        let el = document.getElementById(id);
-        el.addEventListener('touchstart', e => { e.preventDefault(); keys[k]=true; });
-        el.addEventListener('touchend', e => { e.preventDefault(); keys[k]=false; });
-    };
-    tBind('btn-left', 'l'); tBind('btn-right', 'r');
-    tBind('btn-jump', 'u'); tBind('btn-attack', 'atk');
-}
-
-// --- ART GENERATOR (Процедурный пиксель-арт) ---
+// --- ГРАФИКА (ПРОГРАММНЫЕ СПРАЙТЫ) ---
 const Art = {
-    // Рисуем кирпичную стену с текстурой
+    rect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); },
+
+    // Стена
     wall: (x, y) => {
-        // База
-        ctx.fillStyle = C.brick;
-        ctx.fillRect(x, y, TILE, TILE);
-
-        // Швы и детали (имитация 16bit)
-        ctx.fillStyle = C.brickD;
-        ctx.fillRect(x, y, TILE, 2); // Верхняя тень
-        ctx.fillRect(x, y+TILE-2, TILE, 2); // Нижняя тень
-
-        // Кирпичный узор
-        ctx.fillRect(x+10, y, 2, TILE); // Вертикальный шов
-        ctx.fillStyle = C.brickL;
-        ctx.fillRect(x+2, y+4, 6, 2); // Блик
-        ctx.fillRect(x+14, y+10, 4, 2); // Блик
-
-        // Мох (иногда)
-        if((x+y)%7 === 0) {
-            ctx.fillStyle = '#33691e';
-            ctx.fillRect(x, y+TILE-6, 8, 6);
-        }
-    },
-
-    // Фон с колоннами (параллакс эффект делается в рендере)
-    column: (x, y, w, h) => {
-        ctx.fillStyle = '#261e1b'; // Темный колонна
-        ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = '#1a1412';
-        ctx.fillRect(x+4, y, 4, h); // Тень
-        ctx.fillRect(x+w-8, y, 4, h);
-
-        // Капитель
-        ctx.fillStyle = '#3e2723';
-        ctx.fillRect(x-4, y, w+8, 20);
+        Art.rect(x, y, TILE, TILE, '#4e342e'); // Темно-коричневый
+        Art.rect(x, y, TILE, 2, '#6d4c41'); // Светлый верх
+        Art.rect(x+10, y, 2, TILE, '#3e2723'); // Шов
+        Art.rect(x, y+20, TILE, 2, '#3e2723'); // Шов гор.
+        // Декор
+        if ((x+y)%3 === 0) Art.rect(x+5, y+5, 4, 4, '#5d4037');
     },
 
     // Рыцарь
-    knight: (x, y, dir, frame, isAtk) => {
-        const f = isAtk ? 0 : Math.floor(frame / 10) % 2; // Анимация хотьбы (2 кадра)
-        const bounce = f * 2;
+    player: (x, y, dir, isAtk) => {
+        const c = '#90a4ae'; // Броня
+        const c2 = '#1976d2'; // Ткань
 
-        ctx.save();
-        if (dir === -1) {
-            ctx.translate(x + 32, y);
-            ctx.scale(-1, 1);
-            x = 0; y = 0;
-        }
-
-        // Ноги
-        ctx.fillStyle = '#555';
-        ctx.fillRect(x+8, y+24-bounce, 6, 8);
-        ctx.fillRect(x+18, y+24+bounce, 6, 8);
-
-        // Тело (Броня)
-        ctx.fillStyle = '#9e9e9e'; // Серебро
-        ctx.fillRect(x+6, y+10, 20, 16);
-        ctx.fillStyle = '#1976d2'; // Нагрудник (синий)
-        ctx.fillRect(x+10, y+12, 12, 10);
+        // Тело
+        Art.rect(x+8, y+10, 24, 20, c);
+        Art.rect(x+12, y+14, 16, 12, c2); // Нагрудник
 
         // Голова
-        ctx.fillStyle = '#bdbdbd'; // Шлем
-        ctx.fillRect(x+8, y-2+bounce, 16, 14);
-        ctx.fillStyle = '#000'; // Забрало
-        ctx.fillRect(x+18, y+2+bounce, 6, 2); 
+        Art.rect(x+10, y, 20, 10, c);
+        Art.rect(x+20 + (dir*4), y+2, 6, 2, '#000'); // Глаза
 
-        // Меч
+        // Ноги
+        Art.rect(x+10, y+30, 8, 10, '#37474f');
+        Art.rect(x+22, y+30, 8, 10, '#37474f');
+
+        // Оружие
         if (isAtk) {
+            // Удар
             ctx.fillStyle = '#fff';
-            // Взмах (эффект)
-            ctx.globalAlpha = 0.5;
+            let sx = dir===1 ? x+30 : x-30;
             ctx.beginPath();
-            ctx.arc(x+25, y+16, 25, -0.5, 1.5);
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 4;
-            ctx.stroke();
+            ctx.arc(x+20, y+20, 35, 0, Math.PI*2);
+            ctx.globalAlpha = 0.5;
+            ctx.fill();
             ctx.globalAlpha = 1.0;
-
-            // Клинок
-            ctx.fillRect(x+20, y+16, 20, 4);
+            Art.rect(sx, y+15, 30, 6, '#fff'); // Меч
         } else {
             // В руке
-            ctx.fillStyle = '#ddd';
-            ctx.fillRect(x+20, y+14+bounce, 4, 12);
+            let sx = dir===1 ? x+26 : x-6;
+            Art.rect(sx, y+12, 4, 16, '#cfd8dc');
         }
-
-        ctx.restore();
     },
 
-    enemy: (x, y, type, dir, frame) => {
-        const bounce = Math.sin(frame/5) * 2;
-        if (type === 1) { // Скелет
-            ctx.fillStyle = '#eee'; // Кости
-            ctx.fillRect(x+10, y+4+bounce, 12, 12); // Череп
-            ctx.fillStyle = '#000';
-            ctx.fillRect(x+12+(dir>0?4:0), y+6+bounce, 2, 2); // Глаз
-
-            ctx.fillStyle = '#ddd'; 
-            ctx.fillRect(x+12, y+16, 8, 10); // Ребра
-            ctx.fillRect(x+8, y+16, 2, 8); // Рука Л
-            ctx.fillRect(x+22, y+16, 2, 8); // Рука П
-
-            // Меч
-            ctx.fillStyle = '#ccc';
-            let sx = dir > 0 ? x+24 : x-8;
-            ctx.fillRect(sx, y+18+bounce, 16, 3);
-
-        } else if (type === 2) { // Слизень
-            const squash = Math.abs(Math.sin(frame/10)) * 5;
-            ctx.fillStyle = '#76ff03'; // Зеленый неон
-            ctx.fillRect(x+2, y+16+squash, 28, 16-squash);
-            ctx.fillStyle = '#ccff90'; // Блик
-            ctx.fillRect(x+6, y+18+squash, 4, 4);
-            // Глаза
-            ctx.fillStyle = '#000';
-            ctx.fillRect(x+8, y+20+squash, 4, 4);
-            ctx.fillRect(x+20, y+20+squash, 4, 4);
+    // Враг
+    enemy: (x, y, type, dir) => {
+        if(type === 1) { // Слизень
+            Art.rect(x+2, y+15, 36, 25, '#76ff03');
+            Art.rect(x+8 + (dir*4), y+20, 6, 6, '#000');
+            Art.rect(x+20 + (dir*4), y+20, 6, 6, '#000');
+        } else { // Скелет
+            Art.rect(x+10, y+5, 20, 35, '#eee');
+            Art.rect(x+14 + (dir*2), y+10, 4, 4, '#000');
+            Art.rect(x+22 + (dir*2), y+10, 4, 4, '#000');
+            // Меч скелета
+            Art.rect(x + (dir===1?25:-5), y+20, 20, 4, '#bdbdbd');
         }
     },
 
     door: (x, y) => {
-        ctx.fillStyle = '#111';
-        ctx.fillRect(x, y, 40, 60);
-        // Арка
-        ctx.fillStyle = C.brickL;
-        ctx.fillRect(x-4, y, 4, 60);
-        ctx.fillRect(x+40, y, 4, 60);
-        ctx.fillRect(x-4, y-4, 48, 4);
-        // Портал
-        ctx.fillStyle = '#6a1b9a';
-        ctx.fillRect(x+4, y+4, 32, 52);
-        // Сияние
-        ctx.fillStyle = '#ab47bc';
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(x+8, y+8, 24, 44);
-        ctx.globalAlpha = 1.0;
-    },
-
-    // Рисуем портрет в HUD (один раз на отдельный canvas)
-    drawPortrait: () => {
-        const pc = document.getElementById('portrait-canvas');
-        const pctx = pc.getContext('2d');
-        pctx.fillStyle = '#5d4037'; pctx.fillRect(0,0,50,50); // Фон
-        pctx.fillStyle = '#bdbdbd'; // Шлем
-        pctx.fillRect(10, 5, 30, 40);
-        pctx.fillStyle = '#1976d2'; // Глаза
-        pctx.fillRect(18, 20, 4, 4); pctx.fillRect(28, 20, 4, 4);
-        pctx.strokeStyle = '#000'; pctx.strokeRect(10,5,30,40);
+        Art.rect(x, y, 40, 60, '#000');
+        Art.rect(x-4, y, 4, 60, '#5d4037'); // Рамка
+        Art.rect(x+40, y, 4, 60, '#5d4037');
+        Art.rect(x+5, y+5, 30, 50, '#7b1fa2'); // Портал
     }
 };
 
-// Вызываем отрисовку портрета
-Art.drawPortrait();
-
-// --- ИГРОВОЙ МИР ---
+/* --- ИГРА --- */
 const Game = {
-    state: 'MENU',
+    running: false,
     level: 1,
     map: [],
-    mapW: 0, mapH: 14,
+    mapW: 0, mapH: 15,
+    camX: 0,
+
     entities: [],
-    particles: [],
-    cam: 0,
+
+    player: { x: 100, y: 100, w: 30, h: 40, vx: 0, vy: 0, hp: 100, maxHp: 100, gold: 0, dmg: 10, dir: 1, atkCd: 0, iFrame: 0 },
     door: null,
 
-    player: { 
-        x:0, y:0, w:20, h:30, vx:0, vy:0, 
-        hp:100, maxHp:100, mp:100, gold:0, dmg:10, 
-        dir:1, iframe:0, atkCd:0, frame:0 
-    },
-
-    init: function() {
-        if(localStorage.getItem('eq_save')) document.getElementById('btn-continue').style.display = 'block';
-        requestAnimationFrame(loop);
-    },
-
-    newGame: function() {
+    // Запуск новой игры
+    startNewGame: function() {
+        this.player.hp = 100;
+        this.player.gold = 0;
         this.level = 1;
-        this.player.hp = 100; this.player.gold = 0; this.player.dmg = 10;
-        this.startLevel();
-    },
-
-    loadGame: function() {
-        const d = JSON.parse(localStorage.getItem('eq_save'));
-        this.level = d.level;
-        this.player.hp = d.hp; this.player.gold = d.gold; this.player.dmg = d.dmg;
-        this.player.maxHp = d.maxHp;
-        this.startLevel();
-    },
-
-    startLevel: function() {
-        this.genMap();
-        this.state = 'PLAY';
-        this.hideMenus();
-        this.player.iframe = 0;
-        this.player.vx = 0;
+        this.player.dmg = 10;
+        this.loadLevel();
     },
 
     nextLevel: function() {
         this.level++;
-        this.startLevel();
+        this.loadLevel();
     },
 
-    hideMenus: function() {
-        document.querySelectorAll('.menu-overlay').forEach(el => el.style.display = 'none');
+    loadLevel: function() {
+        // Сброс UI
+        document.querySelectorAll('.menu-overlay').forEach(e => e.style.display = 'none');
+        this.resize();
+
+        // Генерация
+        this.genMap();
+        this.running = true;
+        this.loop();
     },
 
-    // Генерация руин
+    resize: function() {
+        W = window.innerWidth;
+        H = window.innerHeight;
+        canvas.width = W;
+        canvas.height = H;
+        ctx.imageSmoothingEnabled = false;
+    },
+
     genMap: function() {
         this.map = [];
         this.entities = [];
-        this.particles = [];
-        this.mapW = 40 + (this.level * 5); // Длина растет
+        this.mapW = 40 + (this.level * 5); // Длина карты
 
-        // Заполняем пустотой
-        for(let y=0; y<this.mapH; y++) this.map[y] = new Array(this.mapW).fill(0);
+        // 1. Заполняем пустотой
+        for(let y=0; y<this.mapH; y++) {
+            this.map[y] = new Array(this.mapW).fill(0);
+        }
 
-        let ground = 10;
+        // 2. Генерируем ГАРАНТИРОВАННЫЙ пол
+        const groundY = 10;
         for(let x=0; x<this.mapW; x++) {
-            // Пол
-            if(x===0 || x===this.mapW-1) { // Стены по краям
-                for(let y=0; y<this.mapH; y++) this.map[y][x] = 1;
+            // Границы уровня
+            if (x === 0 || x === this.mapW - 1) {
+                for(let y=0; y<this.mapH; y++) this.map[y][x] = 1; // Стены
+            } 
+            // Пол (с ямами, но не в начале)
+            else if (x > 10 && x < this.mapW - 10 && Math.random() < 0.1) {
+                // Яма - ничего не рисуем
             } else {
-                // Ямы
-                if(x > 5 && x < this.mapW-5 && Math.random() < 0.1) {
-                    // Яма
-                } else {
-                    for(let y=ground; y<this.mapH; y++) this.map[y][x] = 1;
+                this.map[groundY][x] = 1; // Пол
+                // Земля под полом
+                for(let y=groundY+1; y<this.mapH; y++) this.map[y][x] = 1;
 
-                    // Платформы
-                    if(Math.random() < 0.3) {
-                        let py = ground - 3 - Math.floor(Math.random()*2);
-                        if(py > 3) this.map[py][x] = 1;
-                    }
+                // Враги
+                if (x > 10 && Math.random() < 0.1) {
+                    this.spawnEnemy(x*TILE, (groundY-1)*TILE);
+                }
 
-                    // Враги
-                    if(x > 8 && Math.random() < 0.08 && this.map[ground][x]===1) {
-                        let type = (Math.random() > 0.6 && this.level > 1) ? 1 : 2; // 1 скелет, 2 слизень
-                        this.entities.push({
-                            x: x*TILE, y: (ground-1)*TILE, w:32, h:32, 
-                            type: type, hp: 20 + this.level*5, 
-                            vx: 1, vy:0, dir:1, frame:0
-                        });
-                    }
+                // Платформы
+                if (Math.random() < 0.3) {
+                    let py = groundY - 3;
+                    this.map[py][x] = 1;
+                    if(Math.random() < 0.2) this.spawnEnemy(x*TILE, (py-1)*TILE);
                 }
             }
         }
 
-        // Спавн
+        // 3. Спавн игрока (безопасное место)
         this.player.x = TILE * 3;
-        this.player.y = TILE * 5;
-        this.door = { x: (this.mapW-3)*TILE, y: (ground-2)*TILE + 10, w:40, h:60 };
-        // Пол под дверью гарантирован
-        for(let dx=-1; dx<=2; dx++) this.map[ground][this.mapW-3+dx] = 1; 
+        this.player.y = TILE * 5; // Падает сверху
+        this.player.vx = 0;
+        this.player.vy = 0;
+
+        // 4. Дверь (в конце)
+        // Ищем твердую землю в конце карты
+        let doorX = this.mapW - 3;
+        this.map[groundY][doorX] = 1; // Гарантируем пол под дверью
+        this.map[groundY][doorX-1] = 1;
+        this.door = { x: doorX*TILE, y: (groundY-1.5)*TILE, w:40, h:60 };
+    },
+
+    spawnEnemy: function(x, y) {
+        let type = (Math.random()>0.5 && this.level>1) ? 2 : 1;
+        this.entities.push({
+            x:x, y:y, w:30, h:30, 
+            type:type, hp: 20 + (this.level*5), 
+            vx:1, vy:0, dir:1
+        });
     },
 
     update: function() {
-        if(this.state !== 'PLAY') return;
-
+        if(!this.running) return;
         const p = this.player;
-        p.frame++;
 
-        // Физика Игрока
+        // --- ИГРОК ---
         if(keys.l) { p.vx = -SPEED; p.dir = -1; }
         else if(keys.r) { p.vx = SPEED; p.dir = 1; }
-        else p.vx *= 0.8;
+        else p.vx *= 0.5;
 
+        // Прыжок
+        if(keys.u && p.grounded) { p.vy = -JUMP; p.grounded = false; }
+
+        // Физика
         p.vy += GRAVITY;
         p.x += p.vx;
         this.collide(p, 'x');
         p.y += p.vy;
         this.collide(p, 'y');
 
-        // Прыжок
-        if(keys.u && p.grounded) { p.vy = -JUMP_POWER; p.grounded = false; }
+        // Смерть от падения
+        if(p.y > this.mapH * TILE + 200) this.gameOver();
 
         // Атака
         if(p.atkCd > 0) p.atkCd--;
         if(keys.atk && p.atkCd === 0) {
             p.atkCd = 20;
-            // Хитбокс
-            let hit = { x: p.dir>0 ? p.x+p.w : p.x-40, y: p.y, w:40, h:p.h };
+            // Хитбокс удара
+            let hitX = p.dir === 1 ? p.x + p.w : p.x - 40;
+            let hitRect = { x: hitX, y: p.y, w: 40, h: p.h };
+
             this.entities.forEach(e => {
-                if(rect(hit, e)) {
+                if(this.rectIntersect(hitRect, e)) {
                     e.hp -= p.dmg;
-                    e.vx = p.dir * 5; e.vy = -3; // Отброс
-                    this.addPart(e.x, e.y, '#fff', 5);
+                    e.vx = p.dir * 8; // Отброс
+                    e.vy = -5;
+                    e.grounded = false;
                     if(e.hp <= 0) {
                         e.dead = true;
-                        p.gold += (e.type===1 ? 15 : 5);
-                        this.addPart(e.x, e.y, '#ffd700', 10);
+                        p.gold += 10;
                     }
                 }
             });
         }
 
-        // Враги
+        // --- ВРАГИ ---
         this.entities.forEach(e => {
-            e.frame++;
             e.vy += GRAVITY;
 
-            // AI
-            if(e.type === 2) { // Слизень (тупой патруль)
-                if(e.grounded && (this.getTileAt(e.x + (e.vx>0?35:-5), e.y+35) === 0 || e.vx===0)) e.vx *= -1;
-            } else { // Скелет (агро)
-                let dist = p.x - e.x;
-                if(Math.abs(dist) < 200 && Math.abs(p.y - e.y) < 50) e.vx = Math.sign(dist) * 2;
-                else e.vx = 0;
+            // Простой ИИ
+            if(e.grounded) {
+                if(e.type === 1) { // Слизень (тупой)
+                   if(Math.random()<0.02) e.dir *= -1;
+                } else { // Скелет (идет к игроку)
+                    if(Math.abs(p.x - e.x) < 200) {
+                        e.dir = p.x > e.x ? 1 : -1;
+                    }
+                }
+                e.vx = e.dir * (e.type===1 ? 2 : 3);
             }
-            if(e.vx !== 0) e.dir = Math.sign(e.vx);
 
             e.x += e.vx; this.collide(e, 'x');
             e.y += e.vy; this.collide(e, 'y');
 
             // Урон игроку
-            if(!e.dead && rect(p, e) && p.iframe === 0) {
-                p.hp -= 15;
-                p.iframe = 60;
-                p.vy = -5; p.vx = -p.dir * 5;
-                this.addPart(p.x, p.y, '#b71c1c', 10);
+            if(this.rectIntersect(p, e) && !e.dead && p.iFrame <= 0) {
+                p.hp -= 20;
+                p.iFrame = 60;
+                p.vy = -8;
+                p.vx = -p.dir * 10;
                 if(p.hp <= 0) this.gameOver();
             }
         });
         this.entities = this.entities.filter(e => !e.dead);
+        if(p.iFrame > 0) p.iFrame--;
 
-        // Частицы
-        this.particles.forEach(pt => { pt.x+=pt.vx; pt.y+=pt.vy; pt.life--; });
-        this.particles = this.particles.filter(pt => pt.life > 0);
+        // --- КАМЕРА ---
+        let targetCam = p.x - W/2;
+        // Ограничиваем камеру, чтобы не видеть пустоту
+        targetCam = Math.max(0, Math.min(targetCam, this.mapW * TILE - W));
+        this.camX += (targetCam - this.camX) * 0.1;
 
-        if(p.iframe > 0) p.iframe--;
+        // --- ВЫХОД ---
+        if(this.rectIntersect(p, this.door)) {
+            this.levelComplete();
+        }
 
-        // Смерть от падения
-        if(p.y > H + 100 || p.y > this.mapH*TILE) { p.hp = 0; this.gameOver(); }
-
-        // Дверь
-        if(rect(p, this.door)) this.levelComplete();
-
-        // Камера
-        let target = p.x - W/2;
-        target = Math.max(0, Math.min(target, this.mapW*TILE - W));
-        this.cam += (target - this.cam) * 0.1;
-
-        // UI Update
-        document.getElementById('hp-bar').style.width = (p.hp/p.maxHp)*100 + '%';
-        document.getElementById('level-display').innerText = this.level;
-        document.getElementById('gold-display').innerText = '💰 ' + p.gold;
+        // UI
+        document.getElementById('hp-bar').style.width = (p.hp / p.maxHp * 100) + '%';
+        document.getElementById('ui-gold').innerText = p.gold;
+        document.getElementById('ui-lvl').innerText = this.level;
     },
 
     draw: function() {
-        // Фон и очистка
-        ctx.fillStyle = C.bg;
-        ctx.fillRect(0,0,W,H);
+        // Фон (Серый чтобы видеть границы, если что-то пойдет не так)
+        ctx.fillStyle = '#212121'; 
+        ctx.fillRect(0, 0, W, H);
 
-        // Параллакс колонны
         ctx.save();
-        ctx.translate(-this.cam * 0.5, 0);
-        for(let i=0; i<this.mapW/4; i++) {
-            Art.column(i*200, 50, 40, H);
-        }
-        ctx.restore();
+        ctx.translate(-Math.floor(this.camX), 0);
 
-        // Основной слой
-        ctx.save();
-        ctx.translate(-Math.floor(this.cam), 0);
+        // Рисуем карту (только видимую часть)
+        let startCol = Math.floor(this.camX / TILE);
+        let endCol = startCol + (W / TILE) + 2;
 
-        // Карта (оптимизация: рисуем только видимое)
-        let sx = Math.floor(this.cam / TILE);
-        let ex = sx + Math.floor(W / TILE) + 2;
         for(let y=0; y<this.mapH; y++) {
-            for(let x=sx; x<ex; x++) {
-                if(this.map[y] && this.map[y][x]) Art.wall(x*TILE, y*TILE);
+            for(let x=startCol; x<endCol; x++) {
+                if(this.map[y] && this.map[y][x]) {
+                    Art.wall(x*TILE, y*TILE);
+                }
             }
         }
 
@@ -740,43 +499,14 @@ const Game = {
         Art.door(this.door.x, this.door.y);
 
         // Враги
-        this.entities.forEach(e => Art.enemy(e.x, e.y, e.type, e.dir, e.frame));
+        this.entities.forEach(e => Art.enemy(e.x, e.y, e.type, e.dir));
 
-        // Игрок
-        if(this.player.iframe % 4 < 2) {
-            Art.knight(this.player.x, this.player.y, this.player.dir, this.player.frame, this.player.atkCd > 10);
+        // Игрок (мигание если ранен)
+        if(Math.floor(this.player.iFrame / 5) % 2 === 0) {
+            Art.player(this.player.x, this.player.y, this.player.dir, this.player.atkCd > 10);
         }
-
-        // Частицы
-        this.particles.forEach(pt => {
-            ctx.fillStyle = pt.c;
-            ctx.fillRect(pt.x, pt.y, 4, 4);
-        });
 
         ctx.restore();
-
-        // Миникарта
-        this.drawMinimap();
-    },
-
-    drawMinimap: function() {
-        const mc = document.getElementById('minimap');
-        const mctx = mc.getContext('2d');
-        mctx.clearRect(0,0,100,60);
-        // Рисуем точки
-        const scaleX = 100 / (this.mapW*TILE);
-        const scaleY = 60 / (this.mapH*TILE);
-
-        mctx.fillStyle = '#5d4037'; // Стены
-        for(let y=0; y<this.mapH; y++) {
-            for(let x=0; x<this.mapW; x+=2) { // Пропускаем для скорости
-                if(this.map[y][x]) mctx.fillRect(x*TILE*scaleX, y*TILE*scaleY, 2, 2);
-            }
-        }
-        mctx.fillStyle = '#0f0'; // Игрок
-        mctx.fillRect(this.player.x*scaleX, this.player.y*scaleY, 4, 4);
-        mctx.fillStyle = '#f00'; // Враги
-        this.entities.forEach(e => mctx.fillRect(e.x*scaleX, e.y*scaleY, 2, 2));
     },
 
     collide: function(obj, axis) {
@@ -785,11 +515,11 @@ const Game = {
         let y1 = Math.floor(obj.y / TILE);
         let y2 = Math.floor((obj.y + obj.h - 0.1) / TILE);
 
-        if(x1 < 0 || x2 >= this.mapW || y1 < 0 || y2 >= this.mapH) return;
+        if (x1 < 0 || x2 >= this.mapW || y1 < 0 || y2 >= this.mapH) return;
 
         for(let y=y1; y<=y2; y++) {
             for(let x=x1; x<=x2; x++) {
-                if(this.map[y][x]) {
+                if(this.map[y] && this.map[y][x] === 1) {
                     if(axis === 'x') {
                         if(obj.vx > 0) obj.x = x*TILE - obj.w;
                         else obj.x = (x+1)*TILE;
@@ -807,69 +537,77 @@ const Game = {
                 }
             }
         }
-        if(axis === 'y') obj.grounded = false; // Если не нашли коллизию снизу
+        if(axis === 'y') obj.grounded = false;
     },
 
-    getTileAt: function(x, y) {
-        let tx = Math.floor(x/TILE);
-        let ty = Math.floor(y/TILE);
-        if(tx<0||tx>=this.mapW||ty<0||ty>=this.mapH) return 0;
-        return this.map[ty][tx];
-    },
-
-    addPart: function(x, y, c, n) {
-        for(let i=0; i<n; i++) 
-            this.particles.push({x, y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, life:20, c});
+    rectIntersect: function(r1, r2) {
+        return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
     },
 
     levelComplete: function() {
-        this.state = 'REST';
+        this.running = false;
         document.getElementById('rest-menu').style.display = 'flex';
         document.getElementById('rest-gold').innerText = this.player.gold;
-        this.save();
-    },
-
-    save: function() {
-        const d = { 
-            level: this.level+1, hp:this.player.hp, maxHp:this.player.maxHp, 
-            gold:this.player.gold, dmg:this.player.dmg 
-        };
-        localStorage.setItem('eq_save', JSON.stringify(d));
-    },
-
-    buyHeal: function() {
-        if(this.player.gold >= 50) {
-            this.player.gold -= 50; this.player.hp = Math.min(this.player.hp+50, this.player.maxHp);
-            document.getElementById('rest-gold').innerText = this.player.gold;
-            document.getElementById('hp-bar').style.width = (this.player.hp/this.player.maxHp)*100 + '%';
-        }
-    },
-
-    buyUpgrade: function() {
-        if(this.player.gold >= 100) {
-            this.player.gold -= 100; this.player.dmg += 5;
-            document.getElementById('rest-gold').innerText = this.player.gold;
-        }
     },
 
     gameOver: function() {
-        this.state = 'GAMEOVER';
-        document.getElementById('game-over').style.display = 'flex';
-        localStorage.removeItem('eq_save');
+        this.running = false;
+        document.getElementById('death-menu').style.display = 'flex';
+    },
+
+    loop: function() {
+        if(Game.running) {
+            Game.update();
+            Game.draw();
+            requestAnimationFrame(Game.loop);
+        }
+    },
+
+    // Магазин
+    buyHeal: function() {
+        if(this.player.gold >= 50) {
+            this.player.gold -= 50;
+            this.player.hp = Math.min(this.player.hp + 50, this.player.maxHp);
+            document.getElementById('rest-gold').innerText = this.player.gold;
+        }
+    },
+    buyDmg: function() {
+        if(this.player.gold >= 100) {
+            this.player.gold -= 100;
+            this.player.dmg += 5;
+            document.getElementById('rest-gold').innerText = this.player.gold;
+        }
     }
 };
 
-function rect(r1, r2) {
-    return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
-}
+// --- СОБЫТИЯ ---
+window.addEventListener('resize', Game.resize);
 
-function loop() {
-    Game.update();
-    Game.draw();
-    requestAnimationFrame(loop);
-}
+// Клавиатура
+window.onkeydown = e => {
+    if(e.code==='ArrowLeft'||e.code==='KeyA') keys.l=true;
+    if(e.code==='ArrowRight'||e.code==='KeyD') keys.r=true;
+    if(e.code==='ArrowUp'||e.code==='Space') keys.u=true;
+    if(e.code==='KeyZ') keys.atk=true;
+};
+window.onkeyup = e => {
+    if(e.code==='ArrowLeft'||e.code==='KeyA') keys.l=false;
+    if(e.code==='ArrowRight'||e.code==='KeyD') keys.r=false;
+    if(e.code==='ArrowUp'||e.code==='Space') keys.u=false;
+    if(e.code==='KeyZ') keys.atk=false;
+};
 
-Game.init();
+// Тач (Мобильный)
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    document.getElementById('mobile-controls').style.display = 'flex';
+    const bindTouch = (id, key) => {
+        let el = document.getElementById(id);
+        el.addEventListener('touchstart', (e)=>{ e.preventDefault(); keys[key]=true; });
+        el.addEventListener('touchend', (e)=>{ e.preventDefault(); keys[key]=false; });
+    };
+    bindTouch('btn-l', 'l'); bindTouch('btn-r', 'r');
+    bindTouch('btn-j', 'u'); bindTouch('btn-atk', 'atk');
+}
 
 </script>
 </body>
