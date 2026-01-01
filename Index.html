@@ -2,17 +2,23 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ETERNA-QUEST: Dungeon Crawler</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ETERNA-QUEST: Ruin Legends</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
+        :root {
+            --gold: #ffb300;
+            --dark-ui: #151515;
+            --border: #5d4037;
+        }
+
         body {
             margin: 0;
-            background-color: #0d0e15;
+            background-color: #050505;
             overflow: hidden;
             font-family: 'Press Start 2P', cursive;
-            touch-action: none; /* Отключаем зум и скролл на мобильных */
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -24,14 +30,16 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            background: #111;
         }
 
         canvas {
-            image-rendering: pixelated; /* Четкие пиксели */
-            box-shadow: 0 0 20px #000;
+            image-rendering: pixelated; /* Жесткие пиксели */
+            width: 100%;
+            height: 100%;
         }
 
-        /* --- UI СЛОИ --- */
+        /* --- ИНТЕРФЕЙС (HUD) --- */
         .ui-layer {
             position: absolute;
             top: 0;
@@ -39,89 +47,181 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+        }
+
+        /* Верхняя панель */
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .hud-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .portrait-box {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--gold);
+            background: #222;
+            image-rendering: pixelated;
+        }
+
+        .bars {
             display: flex;
             flex-direction: column;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .bar-con {
+            width: 150px;
+            height: 14px;
+            background: #333;
+            border: 2px solid #000;
+            position: relative;
+        }
+
+        .bar-fill { height: 100%; width: 100%; transition: width 0.2s; }
+        .hp-fill { background: #d32f2f; }
+        .mp-fill { background: #1976d2; }
+
+        .level-box {
+            border: 3px solid var(--gold);
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            text-align: center;
+            color: var(--gold);
+            font-size: 12px;
+            min-width: 80px;
+            margin-top: -5px; /* Чуть выше */
+        }
+
+        .minimap-box {
+            width: 100px;
+            height: 60px;
+            border: 3px solid var(--gold);
+            background: #000;
+            opacity: 0.8;
+            margin-right: 10px;
+        }
+
+        /* Правые слоты */
+        #hud-right {
+            position: absolute;
+            right: 10px;
+            top: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .item-slot {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--gold);
+            background: rgba(0,0,0,0.7);
+            display: flex;
             justify-content: center;
             align-items: center;
+            color: #fff;
+            font-size: 10px;
+            position: relative;
+        }
+        .item-count {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 8px;
         }
 
-        /* Главное меню и Привал */
-        .menu-box {
+        /* Меню (Привал / Старт) */
+        .menu-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
             pointer-events: auto;
-            background: rgba(20, 16, 19, 0.95);
-            border: 4px solid #8b7355;
+            z-index: 20;
+            display: none;
+        }
+
+        .menu-box {
+            background: #2e2724;
+            border: 4px solid var(--gold);
             padding: 20px;
             text-align: center;
-            color: #dcdcdc;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            display: none; /* Скрыто по умолчанию */
-            max-width: 400px;
-            width: 80%;
-        }
-
-        .menu-title {
-            color: #ffd700;
-            font-size: 24px;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 0 #000;
+            color: #fff;
+            box-shadow: 0 0 20px #000;
+            width: 300px;
         }
 
         .btn {
-            background: #3e3e42;
-            border: 2px solid #555;
-            color: white;
-            font-family: inherit;
+            background: #5d4037;
+            border: 2px solid #8d6e63;
+            color: var(--gold);
             padding: 15px;
-            margin: 10px 0;
             width: 100%;
+            margin: 10px 0;
+            font-family: inherit;
             cursor: pointer;
             text-transform: uppercase;
-            font-size: 12px;
-            transition: all 0.1s;
         }
+        .btn:active { background: #3e2723; transform: scale(0.98); }
 
-        .btn:active { transform: translateY(2px); background: #555; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-green { background: #2e7d32; border-color: #4caf50; }
-        .btn-red { background: #b71c1c; border-color: #f44336; }
-
-        /* --- МОБИЛЬНОЕ УПРАВЛЕНИЕ --- */
+        /* УПРАВЛЕНИЕ ДЛЯ ТЕЛЕФОНА */
         #mobile-controls {
             position: absolute;
             bottom: 20px;
+            left: 0;
             width: 100%;
-            height: 150px;
-            pointer-events: none;
-            display: none; /* Включается через JS если тач-устройство */
-            justify-content: space-between;
-            padding: 0 20px;
+            height: 120px;
+            padding: 0 30px;
+            padding-bottom: env(safe-area-inset-bottom); /* Фикс для iPhone/Tablet */
             box-sizing: border-box;
-        }
-
-        .control-group {
-            pointer-events: auto;
-            display: flex;
-            gap: 15px;
+            display: none; /* JS включит */
+            justify-content: space-between;
             align-items: flex-end;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        .touch-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.15);
+        .ctrl-btn {
+            width: 64px;
+            height: 64px;
+            background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
+            border-radius: 12px;
+            pointer-events: auto;
             display: flex;
             justify-content: center;
             align-items: center;
-            color: white;
             font-size: 24px;
-            backdrop-filter: blur(2px);
+            backdrop-filter: blur(4px);
+            color: #eee;
         }
+        .ctrl-btn:active { background: rgba(255,215,0, 0.3); border-color: var(--gold); }
 
-        .touch-btn:active { background: rgba(255, 255, 255, 0.4); }
-        .btn-big { width: 70px; height: 70px; background: rgba(180, 50, 50, 0.3); border-color: #f44336; } /* Атака */
-        .btn-jump { background: rgba(50, 180, 50, 0.3); border-color: #4caf50; }
+        .d-pad { display: flex; gap: 15px; }
+        .actions { display: flex; gap: 15px; }
+        .btn-atk { background: rgba(200, 50, 50, 0.2); border-color: #ef5350; width: 70px; height: 70px; }
+
+        /* Золото счетчик */
+        #gold-display {
+            position: absolute;
+            top: 70px;
+            left: 10px;
+            color: var(--gold);
+            font-size: 14px;
+            text-shadow: 2px 2px 0 #000;
+        }
 
     </style>
 </head>
@@ -130,758 +230,645 @@
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
 
-    <!-- UI Слой: Главное меню -->
-    <div id="main-menu" class="ui-layer">
-        <div class="menu-box" style="display: block;">
-            <div class="menu-title">ETERNA QUEST</div>
-            <div style="margin-bottom: 20px; font-size: 10px; color: #888;">ДРЕВНИЕ РУИНЫ ЖДУТ</div>
-            <button id="btn-continue" class="btn btn-green" style="display:none;" onclick="Game.loadGame()">ПРОДОЛЖИТЬ</button>
+    <!-- ИНТЕРФЕЙС -->
+    <div id="ui-layer" class="ui-layer">
+
+        <div id="hud-top">
+            <div class="hud-group">
+                <canvas id="portrait-canvas" width="50" height="50" class="portrait-box"></canvas>
+                <div class="bars">
+                    <div class="bar-con"><div id="hp-bar" class="bar-fill hp-fill"></div></div>
+                    <div class="bar-con"><div id="mp-bar" class="bar-fill mp-fill"></div></div>
+                </div>
+            </div>
+
+            <div class="level-box">
+                LEVEL<br><span id="level-display" style="font-size:18px; display:block; margin-top:5px;">1</span>
+            </div>
+
+            <canvas id="minimap" width="100" height="60" class="minimap-box"></canvas>
+        </div>
+
+        <div id="gold-display">💰 0</div>
+
+        <div id="hud-right">
+            <div class="item-slot">⚔️<span class="item-count">1</span></div>
+            <div class="item-slot">🛡️<span class="item-count">1</span></div>
+            <div class="item-slot">🧪<span class="item-count">3</span></div>
+        </div>
+    </div>
+
+    <!-- МЕНЮ -->
+    <div id="main-menu" class="menu-overlay" style="display: flex;">
+        <div class="menu-box">
+            <h1 style="color:var(--gold); text-shadow:2px 2px 0 #000;">ETERNA QUEST</h1>
+            <p style="font-size:10px; color:#aaa; margin-bottom:20px;">THE ENDLESS RUINS</p>
+            <button id="btn-continue" class="btn" style="display:none;" onclick="Game.loadGame()">ПРОДОЛЖИТЬ</button>
             <button class="btn" onclick="Game.newGame()">НОВАЯ ИГРА</button>
         </div>
     </div>
 
-    <!-- UI Слой: Привал (Магазин) -->
-    <div id="rest-menu" class="ui-layer" style="display: none;">
-        <div class="menu-box" style="display: block;">
-            <div class="menu-title">ПРИВАЛ</div>
-            <p>Уровень <span id="rest-lvl">1</span> пройден!</p>
-            <p>Золото: <span id="rest-gold" style="color:gold">0</span></p>
-            <hr style="border-color:#444">
-
-            <button class="btn" onclick="Game.buyHeal()">
-                ❤️ Лечение (+30 HP) <br><span style="color:gold; font-size:10px;">50 зол.</span>
-            </button>
-
-            <button class="btn" onclick="Game.buyUpgrade()">
-                ⚔️ Заточить меч (+1 Урон) <br><span style="color:gold; font-size:10px;">100 зол.</span>
-            </button>
-
-            <button class="btn btn-green" onclick="Game.nextLevel()">
-                🚪 СЛЕДУЮЩИЙ УРОВЕНЬ
-            </button>
+    <div id="rest-menu" class="menu-overlay">
+        <div class="menu-box">
+            <h2>ПРИВАЛ</h2>
+            <p>Уровень зачищен!</p>
+            <p style="color:var(--gold)">Ваше золото: <span id="rest-gold">0</span></p>
+            <hr style="border-color:#555; margin: 15px 0;">
+            <button class="btn" onclick="Game.buyHeal()">ЛЕЧЕНИЕ (50$)</button>
+            <button class="btn" onclick="Game.buyUpgrade()">ЗАТОЧКА (+DMG) (100$)</button>
+            <button class="btn" style="background:var(--gold); color:#000;" onclick="Game.nextLevel()">ДАЛЕЕ ➡</button>
         </div>
     </div>
 
-    <!-- UI Слой: Game Over -->
-    <div id="game-over" class="ui-layer" style="display: none;">
-        <div class="menu-box" style="display: block; border-color: #b71c1c;">
-            <div class="menu-title" style="color: #f44336;">ТЫ ПОГИБ</div>
-            <p>Твой путь окончен.</p>
-            <button class="btn btn-red" onclick="location.reload()">В ГЛАВНОЕ МЕНЮ</button>
+    <div id="game-over" class="menu-overlay">
+        <div class="menu-box" style="border-color:#d32f2f;">
+            <h2 style="color:#d32f2f;">YOU DIED</h2>
+            <p>Ваши кости останутся здесь...</p>
+            <button class="btn" onclick="location.reload()">В МЕНЮ</button>
         </div>
     </div>
 
-    <!-- Мобильное управление -->
+    <!-- УПРАВЛЕНИЕ -->
     <div id="mobile-controls">
-        <div class="control-group">
-            <div class="touch-btn" id="btn-left">⬅️</div>
-            <div class="touch-btn" id="btn-right">➡️</div>
+        <div class="d-pad">
+            <div class="ctrl-btn" id="btn-left">⬅️</div>
+            <div class="ctrl-btn" id="btn-right">➡️</div>
         </div>
-        <div class="control-group">
-            <div class="touch-btn btn-big" id="btn-attack">⚔️</div>
-            <div class="touch-btn btn-jump" id="btn-jump">⬆️</div>
+        <div class="actions">
+            <div class="ctrl-btn btn-atk" id="btn-attack">⚔️</div>
+            <div class="ctrl-btn" id="btn-jump">⬆️</div>
         </div>
     </div>
 </div>
 
 <script>
 /**
- * ETERNA-QUEST
- * Single File Game Engine
+ * ETERNA-QUEST: Engine 2.0
+ * Pixel Art Procedural Generation
  */
 
-// --- КОНСТАНТЫ И НАСТРОЙКИ ---
-const TILE_SIZE = 32;
-const GRAVITY = 0.6;
-const FRICTION = 0.8;
-const MOVE_SPEED = 5;
-const JUMP_FORCE = 12;
+// --- КОНСТАНТЫ ---
+const TILE = 40; // Размер клетки (крупнее для пиксель-арта)
+const GRAVITY = 0.8;
+const JUMP_POWER = 14;
+const SPEED = 6;
 
-// Цвета
-const COLORS = {
-    bg: '#1a1a24', // Темный сине-фиолетовый
-    bg_col: '#121218',
-    tile: '#5d4037', // Коричневый кирпич
-    tile_light: '#795548',
-    tile_dark: '#3e2723',
-    hero: '#bdbdbd', // Серебряная броня
-    hero_acc: '#1976d2', // Синий плащ
-    slime: '#76ff03',
-    skeleton: '#eeeeee',
-    skull: '#ffeb3b',
+// Цвета для генерации спрайтов
+const C = {
+    brick: '#5d4037', brickD: '#3e2723', brickL: '#8d6e63',
+    bg: '#1a1a1d', col: '#121215',
+    sky: '#0d0d12',
     gold: '#ffd700',
-    door: '#000000',
-    door_frame: '#5d4037'
+    blood: '#b71c1c'
 };
 
-// --- ДВИЖОК И ВВОД ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+let W, H;
 
-let width, height;
-// Масштабирование Canvas
+// Настройка Canvas
 function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-    ctx.imageSmoothingEnabled = false; // Пиксель-арт режим
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W;
+    canvas.height = H;
+    ctx.imageSmoothingEnabled = false;
 }
 window.addEventListener('resize', resize);
 resize();
 
-// Управление
-const keys = { left: false, right: false, up: false, attack: false };
+// --- УПРАВЛЕНИЕ ---
+const keys = { l: false, r: false, u: false, atk: false };
+const bind = (k, v) => {
+    if(k==='ArrowLeft'||k==='KeyA') keys.l=v;
+    if(k==='ArrowRight'||k==='KeyD') keys.r=v;
+    if(k==='ArrowUp'||k==='Space') keys.u=v;
+    if(k==='KeyZ'||k==='KeyK') keys.atk=v;
+};
+window.onkeydown = e => bind(e.code, true);
+window.onkeyup = e => bind(e.code, false);
 
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
-    if (e.code === 'Space' || e.code === 'ArrowUp') keys.up = true;
-    if (e.code === 'KeyZ' || e.key === 'z') keys.attack = true;
-});
-
-window.addEventListener('keyup', (e) => {
-    if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
-    if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
-    if (e.code === 'Space' || e.code === 'ArrowUp') keys.up = false;
-    if (e.code === 'KeyZ' || e.key === 'z') keys.attack = false;
-});
-
-// Тач-управление
-const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-if (isTouchDevice) {
+// Сенсор
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     document.getElementById('mobile-controls').style.display = 'flex';
-
-    const bindTouch = (id, key) => {
-        const el = document.getElementById(id);
-        el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
-        el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+    const tBind = (id, k) => {
+        let el = document.getElementById(id);
+        el.addEventListener('touchstart', e => { e.preventDefault(); keys[k]=true; });
+        el.addEventListener('touchend', e => { e.preventDefault(); keys[k]=false; });
     };
-
-    bindTouch('btn-left', 'left');
-    bindTouch('btn-right', 'right');
-    bindTouch('btn-jump', 'up');
-    bindTouch('btn-attack', 'attack');
+    tBind('btn-left', 'l'); tBind('btn-right', 'r');
+    tBind('btn-jump', 'u'); tBind('btn-attack', 'atk');
 }
 
-// --- СПРАЙТЫ (Программная отрисовка) ---
-const Draw = {
-    rect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); },
+// --- ART GENERATOR (Процедурный пиксель-арт) ---
+const Art = {
+    // Рисуем кирпичную стену с текстурой
+    wall: (x, y) => {
+        // База
+        ctx.fillStyle = C.brick;
+        ctx.fillRect(x, y, TILE, TILE);
 
-    // Рисуем тайл (кирпичная стена)
-    tile: (x, y) => {
-        Draw.rect(x, y, TILE_SIZE, TILE_SIZE, COLORS.tile);
-        Draw.rect(x, y, TILE_SIZE, 2, COLORS.tile_light); // Блик
-        Draw.rect(x+4, y+4, 10, 6, COLORS.tile_dark); // Кирпичик 1
-        Draw.rect(x+18, y+16, 10, 6, COLORS.tile_dark); // Кирпичик 2
-        Draw.rect(x, y+TILE_SIZE-2, TILE_SIZE, 2, 'rgba(0,0,0,0.3)'); // Тень
-    },
+        // Швы и детали (имитация 16bit)
+        ctx.fillStyle = C.brickD;
+        ctx.fillRect(x, y, TILE, 2); // Верхняя тень
+        ctx.fillRect(x, y+TILE-2, TILE, 2); // Нижняя тень
 
-    knight: (x, y, dir, isAttacking) => {
-        // Тело
-        Draw.rect(x+4, y+6, 24, 26, COLORS.hero); 
-        // Шлем (забрало)
-        Draw.rect(x+8, y+8, 16, 6, '#333'); 
-        Draw.rect(x+10, y+10, 4, 2, '#000'); // Глаза
-        if(dir>0) Draw.rect(x+18, y+10, 4, 2, '#000'); 
-        else Draw.rect(x+10, y+10, 4, 2, '#000');
+        // Кирпичный узор
+        ctx.fillRect(x+10, y, 2, TILE); // Вертикальный шов
+        ctx.fillStyle = C.brickL;
+        ctx.fillRect(x+2, y+4, 6, 2); // Блик
+        ctx.fillRect(x+14, y+10, 4, 2); // Блик
 
-        // Плащ
-        Draw.rect(x + (dir>0?0:20), y+10, 8, 18, COLORS.hero_acc);
-
-        // Меч
-        if (isAttacking) {
-            ctx.fillStyle = '#fff';
-            // Взмах (белая дуга - просто прямоугольник для пиксельности)
-            let sx = dir > 0 ? x + 24 : x - 24;
-            Draw.rect(sx, y + 10, 24, 8, '#fff');
-        } else {
-            // Меч в ножнах/руке
-            let sx = dir > 0 ? x + 20 : x - 4;
-            Draw.rect(sx, y + 18, 4, 12, '#999');
+        // Мох (иногда)
+        if((x+y)%7 === 0) {
+            ctx.fillStyle = '#33691e';
+            ctx.fillRect(x, y+TILE-6, 8, 6);
         }
     },
 
-    slime: (x, y) => {
-        Draw.rect(x, y+16, 32, 16, COLORS.slime);
-        Draw.rect(x+4, y+12, 24, 4, COLORS.slime); // Верх
-        // Глаза
-        ctx.fillStyle = '#000';
-        Draw.rect(x+6, y+20, 4, 4, '#000');
-        Draw.rect(x+22, y+20, 4, 4, '#000');
+    // Фон с колоннами (параллакс эффект делается в рендере)
+    column: (x, y, w, h) => {
+        ctx.fillStyle = '#261e1b'; // Темный колонна
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#1a1412';
+        ctx.fillRect(x+4, y, 4, h); // Тень
+        ctx.fillRect(x+w-8, y, 4, h);
+
+        // Капитель
+        ctx.fillStyle = '#3e2723';
+        ctx.fillRect(x-4, y, w+8, 20);
     },
 
-    skeleton: (x, y, dir) => {
-        Draw.rect(x+8, y+2, 16, 14, COLORS.skeleton); // Череп
-        Draw.rect(x+10, y+6, 4, 4, '#000'); // Глаз
-        Draw.rect(x+18, y+6, 4, 4, '#000'); // Глаз
-        Draw.rect(x+12, y+18, 8, 14, '#aaa'); // Ребра
-        Draw.rect(x+6, y+18, 4, 12, '#ddd'); // Рука
-        Draw.rect(x+22, y+18, 4, 12, '#ddd'); // Рука
+    // Рыцарь
+    knight: (x, y, dir, frame, isAtk) => {
+        const f = isAtk ? 0 : Math.floor(frame / 10) % 2; // Анимация хотьбы (2 кадра)
+        const bounce = f * 2;
 
-        // Меч скелета
-        let sx = dir > 0 ? x + 24 : x - 8;
-        Draw.rect(sx, y + 20, 16, 4, '#ccc');
+        ctx.save();
+        if (dir === -1) {
+            ctx.translate(x + 32, y);
+            ctx.scale(-1, 1);
+            x = 0; y = 0;
+        }
+
+        // Ноги
+        ctx.fillStyle = '#555';
+        ctx.fillRect(x+8, y+24-bounce, 6, 8);
+        ctx.fillRect(x+18, y+24+bounce, 6, 8);
+
+        // Тело (Броня)
+        ctx.fillStyle = '#9e9e9e'; // Серебро
+        ctx.fillRect(x+6, y+10, 20, 16);
+        ctx.fillStyle = '#1976d2'; // Нагрудник (синий)
+        ctx.fillRect(x+10, y+12, 12, 10);
+
+        // Голова
+        ctx.fillStyle = '#bdbdbd'; // Шлем
+        ctx.fillRect(x+8, y-2+bounce, 16, 14);
+        ctx.fillStyle = '#000'; // Забрало
+        ctx.fillRect(x+18, y+2+bounce, 6, 2); 
+
+        // Меч
+        if (isAtk) {
+            ctx.fillStyle = '#fff';
+            // Взмах (эффект)
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.arc(x+25, y+16, 25, -0.5, 1.5);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+
+            // Клинок
+            ctx.fillRect(x+20, y+16, 20, 4);
+        } else {
+            // В руке
+            ctx.fillStyle = '#ddd';
+            ctx.fillRect(x+20, y+14+bounce, 4, 12);
+        }
+
+        ctx.restore();
     },
 
-    skull: (x, y) => {
-        Draw.rect(x+4, y+4, 24, 20, COLORS.skull);
-        Draw.rect(x+8, y+10, 6, 6, '#000');
-        Draw.rect(x+18, y+10, 6, 6, '#000');
-        // Крылья схематично
-        Draw.rect(x-4, y+8, 8, 4, '#fff');
-        Draw.rect(x+28, y+8, 8, 4, '#fff');
-    },
+    enemy: (x, y, type, dir, frame) => {
+        const bounce = Math.sin(frame/5) * 2;
+        if (type === 1) { // Скелет
+            ctx.fillStyle = '#eee'; // Кости
+            ctx.fillRect(x+10, y+4+bounce, 12, 12); // Череп
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x+12+(dir>0?4:0), y+6+bounce, 2, 2); // Глаз
 
-    coin: (x, y) => {
-        Draw.rect(x+8, y+8, 16, 16, COLORS.gold);
-        Draw.rect(x+12, y+12, 4, 8, '#bfa030'); // Блик
+            ctx.fillStyle = '#ddd'; 
+            ctx.fillRect(x+12, y+16, 8, 10); // Ребра
+            ctx.fillRect(x+8, y+16, 2, 8); // Рука Л
+            ctx.fillRect(x+22, y+16, 2, 8); // Рука П
+
+            // Меч
+            ctx.fillStyle = '#ccc';
+            let sx = dir > 0 ? x+24 : x-8;
+            ctx.fillRect(sx, y+18+bounce, 16, 3);
+
+        } else if (type === 2) { // Слизень
+            const squash = Math.abs(Math.sin(frame/10)) * 5;
+            ctx.fillStyle = '#76ff03'; // Зеленый неон
+            ctx.fillRect(x+2, y+16+squash, 28, 16-squash);
+            ctx.fillStyle = '#ccff90'; // Блик
+            ctx.fillRect(x+6, y+18+squash, 4, 4);
+            // Глаза
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x+8, y+20+squash, 4, 4);
+            ctx.fillRect(x+20, y+20+squash, 4, 4);
+        }
     },
 
     door: (x, y) => {
-        Draw.rect(x, y, TILE_SIZE*1.5, TILE_SIZE*2, COLORS.door_frame);
-        Draw.rect(x+4, y+4, TILE_SIZE*1.5 - 8, TILE_SIZE*2 - 4, '#000');
-        // Портал эффект
-        ctx.fillStyle = '#4a148c';
-        ctx.globalAlpha = 0.5;
-        Draw.rect(x+8, y+8, TILE_SIZE*1.5 - 16, TILE_SIZE*2 - 8, '#7b1fa2');
+        ctx.fillStyle = '#111';
+        ctx.fillRect(x, y, 40, 60);
+        // Арка
+        ctx.fillStyle = C.brickL;
+        ctx.fillRect(x-4, y, 4, 60);
+        ctx.fillRect(x+40, y, 4, 60);
+        ctx.fillRect(x-4, y-4, 48, 4);
+        // Портал
+        ctx.fillStyle = '#6a1b9a';
+        ctx.fillRect(x+4, y+4, 32, 52);
+        // Сияние
+        ctx.fillStyle = '#ab47bc';
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(x+8, y+8, 24, 44);
         ctx.globalAlpha = 1.0;
+    },
+
+    // Рисуем портрет в HUD (один раз на отдельный canvas)
+    drawPortrait: () => {
+        const pc = document.getElementById('portrait-canvas');
+        const pctx = pc.getContext('2d');
+        pctx.fillStyle = '#5d4037'; pctx.fillRect(0,0,50,50); // Фон
+        pctx.fillStyle = '#bdbdbd'; // Шлем
+        pctx.fillRect(10, 5, 30, 40);
+        pctx.fillStyle = '#1976d2'; // Глаза
+        pctx.fillRect(18, 20, 4, 4); pctx.fillRect(28, 20, 4, 4);
+        pctx.strokeStyle = '#000'; pctx.strokeRect(10,5,30,40);
     }
 };
 
-// --- ИГРОВАЯ ЛОГИКА ---
+// Вызываем отрисовку портрета
+Art.drawPortrait();
 
-class Entity {
-    constructor(x, y, w, h) {
-        this.x = x; this.y = y; this.w = w; this.h = h;
-        this.vx = 0; this.vy = 0;
-        this.grounded = false;
-        this.dir = 1; // 1 right, -1 left
-        this.dead = false;
-    }
+// --- ИГРОВОЙ МИР ---
+const Game = {
+    state: 'MENU',
+    level: 1,
+    map: [],
+    mapW: 0, mapH: 14,
+    entities: [],
+    particles: [],
+    cam: 0,
+    door: null,
 
-    update(map) {
-        // Гравитация
-        this.vy += GRAVITY;
+    player: { 
+        x:0, y:0, w:20, h:30, vx:0, vy:0, 
+        hp:100, maxHp:100, mp:100, gold:0, dmg:10, 
+        dir:1, iframe:0, atkCd:0, frame:0 
+    },
 
-        // По X
-        this.x += this.vx;
-        this.checkCollision(map, 'x');
+    init: function() {
+        if(localStorage.getItem('eq_save')) document.getElementById('btn-continue').style.display = 'block';
+        requestAnimationFrame(loop);
+    },
 
-        // По Y
-        this.y += this.vy;
-        this.grounded = false;
-        this.checkCollision(map, 'y');
-    }
+    newGame: function() {
+        this.level = 1;
+        this.player.hp = 100; this.player.gold = 0; this.player.dmg = 10;
+        this.startLevel();
+    },
 
-    checkCollision(map, axis) {
-        // Простая AABB с тайлами
-        let startX = Math.floor(this.x / TILE_SIZE);
-        let endX = Math.floor((this.x + this.w - 0.1) / TILE_SIZE);
-        let startY = Math.floor(this.y / TILE_SIZE);
-        let endY = Math.floor((this.y + this.h - 0.1) / TILE_SIZE);
+    loadGame: function() {
+        const d = JSON.parse(localStorage.getItem('eq_save'));
+        this.level = d.level;
+        this.player.hp = d.hp; this.player.gold = d.gold; this.player.dmg = d.dmg;
+        this.player.maxHp = d.maxHp;
+        this.startLevel();
+    },
 
-        for (let y = startY; y <= endY; y++) {
-            for (let x = startX; x <= endX; x++) {
-                if (map[y] && map[y][x] === 1) { // 1 = стена
-                    if (axis === 'x') {
-                        if (this.vx > 0) this.x = x * TILE_SIZE - this.w;
-                        else this.x = (x + 1) * TILE_SIZE;
-                        this.vx = 0;
+    startLevel: function() {
+        this.genMap();
+        this.state = 'PLAY';
+        this.hideMenus();
+        this.player.iframe = 0;
+        this.player.vx = 0;
+    },
+
+    nextLevel: function() {
+        this.level++;
+        this.startLevel();
+    },
+
+    hideMenus: function() {
+        document.querySelectorAll('.menu-overlay').forEach(el => el.style.display = 'none');
+    },
+
+    // Генерация руин
+    genMap: function() {
+        this.map = [];
+        this.entities = [];
+        this.particles = [];
+        this.mapW = 40 + (this.level * 5); // Длина растет
+
+        // Заполняем пустотой
+        for(let y=0; y<this.mapH; y++) this.map[y] = new Array(this.mapW).fill(0);
+
+        let ground = 10;
+        for(let x=0; x<this.mapW; x++) {
+            // Пол
+            if(x===0 || x===this.mapW-1) { // Стены по краям
+                for(let y=0; y<this.mapH; y++) this.map[y][x] = 1;
+            } else {
+                // Ямы
+                if(x > 5 && x < this.mapW-5 && Math.random() < 0.1) {
+                    // Яма
+                } else {
+                    for(let y=ground; y<this.mapH; y++) this.map[y][x] = 1;
+
+                    // Платформы
+                    if(Math.random() < 0.3) {
+                        let py = ground - 3 - Math.floor(Math.random()*2);
+                        if(py > 3) this.map[py][x] = 1;
+                    }
+
+                    // Враги
+                    if(x > 8 && Math.random() < 0.08 && this.map[ground][x]===1) {
+                        let type = (Math.random() > 0.6 && this.level > 1) ? 1 : 2; // 1 скелет, 2 слизень
+                        this.entities.push({
+                            x: x*TILE, y: (ground-1)*TILE, w:32, h:32, 
+                            type: type, hp: 20 + this.level*5, 
+                            vx: 1, vy:0, dir:1, frame:0
+                        });
+                    }
+                }
+            }
+        }
+
+        // Спавн
+        this.player.x = TILE * 3;
+        this.player.y = TILE * 5;
+        this.door = { x: (this.mapW-3)*TILE, y: (ground-2)*TILE + 10, w:40, h:60 };
+        // Пол под дверью гарантирован
+        for(let dx=-1; dx<=2; dx++) this.map[ground][this.mapW-3+dx] = 1; 
+    },
+
+    update: function() {
+        if(this.state !== 'PLAY') return;
+
+        const p = this.player;
+        p.frame++;
+
+        // Физика Игрока
+        if(keys.l) { p.vx = -SPEED; p.dir = -1; }
+        else if(keys.r) { p.vx = SPEED; p.dir = 1; }
+        else p.vx *= 0.8;
+
+        p.vy += GRAVITY;
+        p.x += p.vx;
+        this.collide(p, 'x');
+        p.y += p.vy;
+        this.collide(p, 'y');
+
+        // Прыжок
+        if(keys.u && p.grounded) { p.vy = -JUMP_POWER; p.grounded = false; }
+
+        // Атака
+        if(p.atkCd > 0) p.atkCd--;
+        if(keys.atk && p.atkCd === 0) {
+            p.atkCd = 20;
+            // Хитбокс
+            let hit = { x: p.dir>0 ? p.x+p.w : p.x-40, y: p.y, w:40, h:p.h };
+            this.entities.forEach(e => {
+                if(rect(hit, e)) {
+                    e.hp -= p.dmg;
+                    e.vx = p.dir * 5; e.vy = -3; // Отброс
+                    this.addPart(e.x, e.y, '#fff', 5);
+                    if(e.hp <= 0) {
+                        e.dead = true;
+                        p.gold += (e.type===1 ? 15 : 5);
+                        this.addPart(e.x, e.y, '#ffd700', 10);
+                    }
+                }
+            });
+        }
+
+        // Враги
+        this.entities.forEach(e => {
+            e.frame++;
+            e.vy += GRAVITY;
+
+            // AI
+            if(e.type === 2) { // Слизень (тупой патруль)
+                if(e.grounded && (this.getTileAt(e.x + (e.vx>0?35:-5), e.y+35) === 0 || e.vx===0)) e.vx *= -1;
+            } else { // Скелет (агро)
+                let dist = p.x - e.x;
+                if(Math.abs(dist) < 200 && Math.abs(p.y - e.y) < 50) e.vx = Math.sign(dist) * 2;
+                else e.vx = 0;
+            }
+            if(e.vx !== 0) e.dir = Math.sign(e.vx);
+
+            e.x += e.vx; this.collide(e, 'x');
+            e.y += e.vy; this.collide(e, 'y');
+
+            // Урон игроку
+            if(!e.dead && rect(p, e) && p.iframe === 0) {
+                p.hp -= 15;
+                p.iframe = 60;
+                p.vy = -5; p.vx = -p.dir * 5;
+                this.addPart(p.x, p.y, '#b71c1c', 10);
+                if(p.hp <= 0) this.gameOver();
+            }
+        });
+        this.entities = this.entities.filter(e => !e.dead);
+
+        // Частицы
+        this.particles.forEach(pt => { pt.x+=pt.vx; pt.y+=pt.vy; pt.life--; });
+        this.particles = this.particles.filter(pt => pt.life > 0);
+
+        if(p.iframe > 0) p.iframe--;
+
+        // Смерть от падения
+        if(p.y > H + 100 || p.y > this.mapH*TILE) { p.hp = 0; this.gameOver(); }
+
+        // Дверь
+        if(rect(p, this.door)) this.levelComplete();
+
+        // Камера
+        let target = p.x - W/2;
+        target = Math.max(0, Math.min(target, this.mapW*TILE - W));
+        this.cam += (target - this.cam) * 0.1;
+
+        // UI Update
+        document.getElementById('hp-bar').style.width = (p.hp/p.maxHp)*100 + '%';
+        document.getElementById('level-display').innerText = this.level;
+        document.getElementById('gold-display').innerText = '💰 ' + p.gold;
+    },
+
+    draw: function() {
+        // Фон и очистка
+        ctx.fillStyle = C.bg;
+        ctx.fillRect(0,0,W,H);
+
+        // Параллакс колонны
+        ctx.save();
+        ctx.translate(-this.cam * 0.5, 0);
+        for(let i=0; i<this.mapW/4; i++) {
+            Art.column(i*200, 50, 40, H);
+        }
+        ctx.restore();
+
+        // Основной слой
+        ctx.save();
+        ctx.translate(-Math.floor(this.cam), 0);
+
+        // Карта (оптимизация: рисуем только видимое)
+        let sx = Math.floor(this.cam / TILE);
+        let ex = sx + Math.floor(W / TILE) + 2;
+        for(let y=0; y<this.mapH; y++) {
+            for(let x=sx; x<ex; x++) {
+                if(this.map[y] && this.map[y][x]) Art.wall(x*TILE, y*TILE);
+            }
+        }
+
+        // Дверь
+        Art.door(this.door.x, this.door.y);
+
+        // Враги
+        this.entities.forEach(e => Art.enemy(e.x, e.y, e.type, e.dir, e.frame));
+
+        // Игрок
+        if(this.player.iframe % 4 < 2) {
+            Art.knight(this.player.x, this.player.y, this.player.dir, this.player.frame, this.player.atkCd > 10);
+        }
+
+        // Частицы
+        this.particles.forEach(pt => {
+            ctx.fillStyle = pt.c;
+            ctx.fillRect(pt.x, pt.y, 4, 4);
+        });
+
+        ctx.restore();
+
+        // Миникарта
+        this.drawMinimap();
+    },
+
+    drawMinimap: function() {
+        const mc = document.getElementById('minimap');
+        const mctx = mc.getContext('2d');
+        mctx.clearRect(0,0,100,60);
+        // Рисуем точки
+        const scaleX = 100 / (this.mapW*TILE);
+        const scaleY = 60 / (this.mapH*TILE);
+
+        mctx.fillStyle = '#5d4037'; // Стены
+        for(let y=0; y<this.mapH; y++) {
+            for(let x=0; x<this.mapW; x+=2) { // Пропускаем для скорости
+                if(this.map[y][x]) mctx.fillRect(x*TILE*scaleX, y*TILE*scaleY, 2, 2);
+            }
+        }
+        mctx.fillStyle = '#0f0'; // Игрок
+        mctx.fillRect(this.player.x*scaleX, this.player.y*scaleY, 4, 4);
+        mctx.fillStyle = '#f00'; // Враги
+        this.entities.forEach(e => mctx.fillRect(e.x*scaleX, e.y*scaleY, 2, 2));
+    },
+
+    collide: function(obj, axis) {
+        let x1 = Math.floor(obj.x / TILE);
+        let x2 = Math.floor((obj.x + obj.w - 0.1) / TILE);
+        let y1 = Math.floor(obj.y / TILE);
+        let y2 = Math.floor((obj.y + obj.h - 0.1) / TILE);
+
+        if(x1 < 0 || x2 >= this.mapW || y1 < 0 || y2 >= this.mapH) return;
+
+        for(let y=y1; y<=y2; y++) {
+            for(let x=x1; x<=x2; x++) {
+                if(this.map[y][x]) {
+                    if(axis === 'x') {
+                        if(obj.vx > 0) obj.x = x*TILE - obj.w;
+                        else obj.x = (x+1)*TILE;
+                        obj.vx = 0;
                     } else {
-                        if (this.vy > 0) {
-                            this.y = y * TILE_SIZE - this.h;
-                            this.grounded = true;
+                        if(obj.vy > 0) {
+                            obj.y = y*TILE - obj.h;
+                            obj.grounded = true;
                         } else {
-                            this.y = (y + 1) * TILE_SIZE;
+                            obj.y = (y+1)*TILE;
                         }
-                        this.vy = 0;
+                        obj.vy = 0;
                     }
                     return;
                 }
             }
         }
-    }
-}
-
-class Player extends Entity {
-    constructor(x, y) {
-        super(x, y, 32, 32);
-        this.hp = 100;
-        this.maxHp = 100;
-        this.gold = 0;
-        this.atkDmg = 10;
-        this.iFrames = 0;
-        this.atkCooldown = 0;
-    }
-
-    control() {
-        // Движение
-        if (keys.left) { this.vx = -MOVE_SPEED; this.dir = -1; }
-        else if (keys.right) { this.vx = MOVE_SPEED; this.dir = 1; }
-        else { this.vx *= FRICTION; }
-
-        // Прыжок
-        if (keys.up && this.grounded) {
-            this.vy = -JUMP_FORCE;
-            this.grounded = false;
-        }
-
-        // Атака
-        if (keys.attack && this.atkCooldown <= 0) {
-            this.atkCooldown = 20; // Кадров
-            // Хитбокс атаки
-            let hitX = this.dir > 0 ? this.x + this.w : this.x - 40;
-            let hitRect = { x: hitX, y: this.y, w: 40, h: this.h };
-
-            // Проверка врагов
-            Game.enemies.forEach(e => {
-                if (rectIntersect(hitRect, e)) {
-                    e.takeDamage(this.atkDmg, this.dir);
-                    Game.spawnParticle(e.x + e.w/2, e.y, '#fff');
-                }
-            });
-        }
-
-        if (this.atkCooldown > 0) this.atkCooldown--;
-        if (this.iFrames > 0) this.iFrames--;
-    }
-
-    takeDamage(amount) {
-        if (this.iFrames > 0) return;
-        this.hp -= amount;
-        this.iFrames = 60; // 1 сек неуязвимости
-        this.vy = -5; // Отброс
-        if (this.hp <= 0) Game.gameOver();
-    }
-}
-
-class Enemy extends Entity {
-    constructor(x, y, type) {
-        super(x, y, 32, 32);
-        this.type = type;
-        this.hp = 20 + Game.level * 2;
-        this.startY = y;
-        this.timer = 0;
-    }
-
-    ai(player, map) {
-        this.timer++;
-
-        if (this.type === 'slime') {
-            // Патруль
-            if (this.vx === 0) this.vx = 2; // Старт
-            // Если уперся в стену или край платформы (упрощенно - только стены пока)
-            let checkX = this.vx > 0 ? this.x + this.w + 5 : this.x - 5;
-            // Простейшая физика Entity сама остановит vx, если стена.
-            // Нам нужно развернуть:
-            let gridX = Math.floor((this.x + (this.vx>0?this.w:0) + this.vx) / TILE_SIZE);
-            let gridY = Math.floor((this.y + this.h) / TILE_SIZE);
-
-            // Если впереди яма
-            if (map[gridY] && map[gridY][gridX] === 0 && this.grounded) {
-                this.vx *= -1;
-            }
-            // Если уперся (vx обнулился физикой)
-            if (Math.abs(this.vx) < 0.1) this.vx = this.dir * 2 * -1;
-
-            this.dir = Math.sign(this.vx);
-
-        } else if (this.type === 'skeleton') {
-            // Агро
-            let dist = Math.abs(player.x - this.x);
-            if (dist < 200 && Math.abs(player.y - this.y) < 64) {
-                if (player.x < this.x) this.vx = -1.5;
-                else this.vx = 1.5;
-            } else {
-                this.vx = 0;
-            }
-            this.dir = this.vx !== 0 ? Math.sign(this.vx) : this.dir;
-
-        } else if (this.type === 'skull') {
-            // Полет синусоидой
-            this.vy = 0; // Отключаем гравитацию хаком
-            this.y = this.startY + Math.sin(this.timer * 0.05) * 50;
-            this.vx = -2;
-            this.dir = -1;
-        }
-
-        // Урон игроку
-        if (rectIntersect(this, player)) {
-            player.takeDamage(10 + Game.level);
-        }
-    }
-
-    takeDamage(dmg, dir) {
-        this.hp -= dmg;
-        this.vx = dir * 5; // Отброс
-        this.vy = -3;
-        if (this.hp <= 0) {
-            this.dead = true;
-            // Дроп золота
-            Game.spawnCoin(this.x, this.y);
-        }
-    }
-
-    // Переопределяем update для черепа (без гравитации)
-    update(map) {
-        if(this.type === 'skull') {
-             this.x += this.vx;
-             // Просто двигаем Y в ai
-        } else {
-            super.update(map);
-        }
-    }
-}
-
-// --- СИСТЕМА ИГРЫ ---
-
-const Game = {
-    state: 'MENU', // MENU, PLAY, REST, GAMEOVER
-    level: 1,
-    map: [],
-    mapWidth: 0,
-    mapHeight: 15, // Высота уровня в тайлах
-    player: null,
-    enemies: [],
-    particles: [],
-    coins: [],
-    door: null,
-    camera: { x: 0 },
-
-    init: function() {
-        // Проверка сохранения
-        const save = localStorage.getItem('eterna_save');
-        if (save) {
-            document.getElementById('btn-continue').style.display = 'block';
-        }
+        if(axis === 'y') obj.grounded = false; // Если не нашли коллизию снизу
     },
 
-    newGame: function() {
-        this.level = 1;
-        this.player = new Player(100, 100);
-        this.startGame();
+    getTileAt: function(x, y) {
+        let tx = Math.floor(x/TILE);
+        let ty = Math.floor(y/TILE);
+        if(tx<0||tx>=this.mapW||ty<0||ty>=this.mapH) return 0;
+        return this.map[ty][tx];
     },
 
-    loadGame: function() {
-        const save = JSON.parse(localStorage.getItem('eterna_save'));
-        this.level = save.level;
-        this.player = new Player(0,0);
-        this.player.hp = save.hp;
-        this.player.maxHp = save.maxHp;
-        this.player.gold = save.gold;
-        this.player.atkDmg = save.atkDmg;
-        this.startGame();
+    addPart: function(x, y, c, n) {
+        for(let i=0; i<n; i++) 
+            this.particles.push({x, y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, life:20, c});
     },
 
-    startGame: function() {
-        document.getElementById('main-menu').style.display = 'none';
-        document.getElementById('game-over').style.display = 'none';
-        document.getElementById('rest-menu').style.display = 'none';
-        this.generateLevel();
-        this.state = 'PLAY';
-        loop();
-    },
-
-    generateLevel: function() {
-        // Процедурная генерация
-        this.map = [];
-        this.enemies = [];
-        this.coins = [];
-        this.particles = [];
-
-        // Длина уровня растет с прогрессом
-        this.mapWidth = 50 + (this.level * 10); 
-
-        // Заполняем пустотой
-        for (let y = 0; y < this.mapHeight; y++) {
-            this.map[y] = new Array(this.mapWidth).fill(0);
-        }
-
-        // Генерируем пол и платформы
-        let groundY = 10;
-        for (let x = 0; x < this.mapWidth; x++) {
-            // Границы
-            if (x === 0 || x === this.mapWidth - 1) {
-                for(let y=0; y<this.mapHeight; y++) this.map[y][x] = 1;
-                continue;
-            }
-
-            // Ямы (с шансом, но не в начале и не в конце)
-            if (x > 10 && x < this.mapWidth - 10 && Math.random() < 0.1) {
-                // Яма шириной 2-3
-                x += Math.floor(Math.random() * 2) + 1;
-                continue;
-            }
-
-            // Пол
-            for (let y = groundY; y < this.mapHeight; y++) {
-                this.map[y][x] = 1;
-            }
-
-            // Платформы
-            if (x > 5 && x < this.mapWidth - 5 && Math.random() < 0.3) {
-                let platY = groundY - 3 - Math.floor(Math.random() * 2);
-                if (platY > 2) {
-                    this.map[platY][x] = 1;
-                    // Враг на платформе?
-                    if (Math.random() < 0.2) this.spawnEnemy(x * TILE_SIZE, (platY - 1) * TILE_SIZE);
-                }
-            }
-
-            // Враги на земле
-            if (x > 10 && x < this.mapWidth - 10 && Math.random() < 0.05) {
-                this.spawnEnemy(x * TILE_SIZE, (groundY - 1) * TILE_SIZE);
-            }
-        }
-
-        // Спавн игрока
-        this.player.x = TILE_SIZE * 3;
-        this.player.y = TILE_SIZE * 5;
-        this.player.vx = 0; this.player.vy = 0;
-        this.player.dir = 1;
-
-        // Дверь
-        this.door = { x: (this.mapWidth - 4) * TILE_SIZE, y: (groundY - 2) * TILE_SIZE, w: 40, h: 64 };
-    },
-
-    spawnEnemy: function(x, y) {
-        let r = Math.random();
-        let type = 'slime';
-        if (this.level > 1 && r > 0.6) type = 'skeleton';
-        if (this.level > 3 && r > 0.9) type = 'skull';
-        this.enemies.push(new Enemy(x, y, type));
-    },
-
-    spawnCoin: function(x, y) {
-        this.coins.push({ x: x, y: y, w: 16, h: 16, vy: -5 });
-    },
-
-    spawnParticle: function(x, y, color) {
-        this.particles.push({x, y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, life: 20, color});
-    },
-
-    update: function() {
-        if (this.state !== 'PLAY') return;
-
-        // Игрок
-        this.player.control();
-        this.player.update(this.map);
-
-        // Падение в бездну
-        if (this.player.y > height + 100 || this.player.y > this.mapHeight * TILE_SIZE) {
-            this.player.hp = 0;
-            this.gameOver();
-        }
-
-        // Камера (следит за игроком)
-        let targetCamX = this.player.x - width / 2;
-        // Ограничение камеры
-        targetCamX = Math.max(0, Math.min(targetCamX, (this.mapWidth * TILE_SIZE) - width));
-        this.camera.x += (targetCamX - this.camera.x) * 0.1; // Плавность
-
-        // Враги
-        this.enemies.forEach(e => {
-            e.ai(this.player, this.map);
-            e.update(this.map);
-        });
-        this.enemies = this.enemies.filter(e => !e.dead);
-
-        // Монеты
-        this.coins.forEach(c => {
-            c.vy += GRAVITY;
-            c.y += c.vy;
-            // Столкновение с полом (простое)
-            if (c.y > this.player.y + 200) c.picked = true; // удаляем если упали
-
-            if (rectIntersect(this.player, c)) {
-                this.player.gold += 10;
-                c.picked = true;
-            }
-        });
-        this.coins = this.coins.filter(c => !c.picked);
-
-        // Частицы
-        this.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life--; });
-        this.particles = this.particles.filter(p => p.life > 0);
-
-        // Выход
-        if (rectIntersect(this.player, this.door)) {
-            this.completeLevel();
-        }
-    },
-
-    draw: function() {
-        // Очистка
-        ctx.fillStyle = COLORS.bg;
-        ctx.fillRect(0, 0, width, height);
-
-        // Фон (Параллакс колонны)
-        ctx.fillStyle = COLORS.bg_col;
-        for(let i=0; i<10; i++) {
-            let x = (i * 200) - (this.camera.x * 0.5) % 200;
-            ctx.fillRect(x, 0, 40, height);
-        }
-
-        ctx.save();
-        ctx.translate(-Math.floor(this.camera.x), 0);
-
-        // Карта
-        for (let y = 0; y < this.mapHeight; y++) {
-            // Оптимизация: рендерим только видимое
-            let startX = Math.floor(this.camera.x / TILE_SIZE);
-            let endX = startX + Math.floor(width / TILE_SIZE) + 1;
-            for (let x = startX; x <= endX; x++) {
-                if (this.map[y] && this.map[y][x] === 1) {
-                    Draw.tile(x * TILE_SIZE, y * TILE_SIZE);
-                }
-            }
-        }
-
-        // Дверь
-        Draw.door(this.door.x, this.door.y);
-
-        // Монеты
-        this.coins.forEach(c => Draw.coin(c.x, c.y));
-
-        // Враги
-        this.enemies.forEach(e => {
-            if (e.type === 'slime') Draw.slime(e.x, e.y);
-            if (e.type === 'skeleton') Draw.skeleton(e.x, e.y, e.dir);
-            if (e.type === 'skull') Draw.skull(e.x, e.y);
-        });
-
-        // Игрок
-        if (this.player.iFrames % 4 < 2) { // Мигание при уроне
-            Draw.knight(this.player.x, this.player.y, this.player.dir, this.player.atkCooldown > 15);
-        }
-
-        // Частицы
-        this.particles.forEach(p => Draw.rect(p.x, p.y, 4, 4, p.color));
-
-        ctx.restore();
-
-        // --- HUD ---
-        this.drawHUD();
-    },
-
-    drawHUD: function() {
-        // Верхняя панель
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(0, 0, width, 50);
-        ctx.fillStyle = '#fff';
-
-        // Портрет и статы
-        Draw.rect(10, 10, 30, 30, '#ccc'); // Портрет
-
-        // HP Bar
-        ctx.fillStyle = '#333'; ctx.fillRect(50, 10, 150, 12);
-        ctx.fillStyle = '#f44336'; ctx.fillRect(50, 10, 150 * (this.player.hp / this.player.maxHp), 12);
-
-        // MP Bar (Декор, пока нет магии)
-        ctx.fillStyle = '#333'; ctx.fillRect(50, 26, 120, 8);
-        ctx.fillStyle = '#2196f3'; ctx.fillRect(50, 26, 120, 8);
-
-        // Золото
-        ctx.fillStyle = COLORS.gold;
-        ctx.fillText(`$${this.player.gold}`, 210, 30);
-
-        // Уровень (центр)
-        ctx.fillStyle = '#fff';
-        ctx.textAlign = 'center';
-        ctx.fillText(`УРОВЕНЬ ${this.level}`, width / 2, 35);
-        ctx.textAlign = 'left';
-
-        // Миникарта (справа)
-        let mapW = 100;
-        let mapH = 40;
-        let mapX = width - mapW - 10;
-        let mapY = 10;
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(mapX, mapY, mapW, mapH);
-
-        // Точка игрока на миникарте
-        let px = (this.player.x / (this.mapWidth * TILE_SIZE)) * mapW;
-        let py = (this.player.y / (this.mapHeight * TILE_SIZE)) * mapH;
-        ctx.fillStyle = '#0f0';
-        ctx.fillRect(mapX + px, mapY + py, 4, 4);
-
-        // Справа слоты (Визуал)
-        if (!isTouchDevice) {
-            let slotY = 60;
-            for(let i=0; i<3; i++) {
-                Draw.rect(width - 40, slotY + i*45, 32, 32, 'rgba(0,0,0,0.5)');
-                ctx.strokeStyle = '#555'; ctx.strokeRect(width - 40, slotY + i*45, 32, 32);
-            }
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('Z', width - 38, slotY + 40); // Подсказка
-        }
-    },
-
-    completeLevel: function() {
+    levelComplete: function() {
         this.state = 'REST';
-        // Сохранение
-        const save = {
-            level: this.level + 1,
-            hp: this.player.hp,
-            maxHp: this.player.maxHp,
-            gold: this.player.gold,
-            atkDmg: this.player.atkDmg
-        };
-        localStorage.setItem('eterna_save', JSON.stringify(save));
-
-        // UI Привала
         document.getElementById('rest-menu').style.display = 'flex';
-        document.getElementById('rest-lvl').innerText = this.level;
         document.getElementById('rest-gold').innerText = this.player.gold;
+        this.save();
     },
 
-    nextLevel: function() {
-        this.level++;
-        document.getElementById('rest-menu').style.display = 'none';
-        this.generateLevel();
-        this.state = 'PLAY';
+    save: function() {
+        const d = { 
+            level: this.level+1, hp:this.player.hp, maxHp:this.player.maxHp, 
+            gold:this.player.gold, dmg:this.player.dmg 
+        };
+        localStorage.setItem('eq_save', JSON.stringify(d));
     },
 
     buyHeal: function() {
-        if (this.player.gold >= 50 && this.player.hp < this.player.maxHp) {
-            this.player.gold -= 50;
-            this.player.hp = Math.min(this.player.hp + 30, this.player.maxHp);
+        if(this.player.gold >= 50) {
+            this.player.gold -= 50; this.player.hp = Math.min(this.player.hp+50, this.player.maxHp);
             document.getElementById('rest-gold').innerText = this.player.gold;
+            document.getElementById('hp-bar').style.width = (this.player.hp/this.player.maxHp)*100 + '%';
         }
     },
 
     buyUpgrade: function() {
-        if (this.player.gold >= 100) {
-            this.player.gold -= 100;
-            this.player.atkDmg += 5; // Сильный буст
+        if(this.player.gold >= 100) {
+            this.player.gold -= 100; this.player.dmg += 5;
             document.getElementById('rest-gold').innerText = this.player.gold;
         }
     },
 
     gameOver: function() {
         this.state = 'GAMEOVER';
-        localStorage.removeItem('eterna_save'); // Хардкор - удаляем сейв (или можно оставить)
         document.getElementById('game-over').style.display = 'flex';
+        localStorage.removeItem('eq_save');
     }
 };
 
-// Утилита пересечений
-function rectIntersect(r1, r2) {
-    return !(r2.x > r1.x + r1.w || 
-             r2.x + r2.w < r1.x || 
-             r2.y > r1.y + r1.h || 
-             r2.y + r2.h < r1.y);
+function rect(r1, r2) {
+    return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
 }
 
-// Игровой цикл
 function loop() {
     Game.update();
     Game.draw();
-    if (Game.state === 'PLAY') requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
 }
 
-// Старт
 Game.init();
 
 </script>
