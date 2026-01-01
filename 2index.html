@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Life: Particle Sandbox</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;800&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #050505;
+            color: #fff;
+            overflow: hidden;
+            font-family: 'JetBrains Mono', monospace;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* --- UI --- */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+        }
+
+        .panel {
+            position: absolute;
+            background: rgba(10, 10, 15, 0.9);
+            border: 1px solid #444;
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: auto;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            width: 300px;
+        }
+
+        #settings { top: 10px; left: 10px; }
+        #presets { bottom: 10px; left: 10px; width: auto; display: flex; gap: 10px; flex-wrap: wrap;}
+
+        h2 {
+            margin: 0 0 10px 0; color: #fff; font-size: 14px; text-transform: uppercase;
+            border-bottom: 1px solid #333; padding-bottom: 5px; letter-spacing: 1px;
+        }
+
+        /* Матрица правил */
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: 20px repeat(4, 1fr);
+            gap: 2px;
+            margin-bottom: 15px;
+        }
+        .matrix-header {
+            font-size: 10px; text-align: center; color: #888; padding: 2px;
+        }
+        .matrix-row-label {
+            font-size: 10px; color: #888; display: flex; align-items: center; justify-content: center;
+        }
+        .matrix-cell input {
+            width: 100%; height: 25px;
+            background: #111; border: 1px solid #333;
+            color: #fff; text-align: center; font-size: 11px;
+            font-family: inherit;
+        }
+        .matrix-cell input:focus { border-color: #fff; outline: none; background: #222; }
+
+        /* Слайдеры */
+        .control-group { margin-bottom: 10px; }
+        label { font-size: 11px; color: #aaa; display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .val { color: #0f0; font-weight: bold; }
+        input[type=range] {
+            width: 100%; height: 4px; background: #333;
+            accent-color: #0f0; cursor: pointer; appearance: none; border-radius: 2px;
+        }
+
+        /* Кнопки */
+        .btn {
+            background: #222; color: #fff; border: 1px solid #444;
+            padding: 8px 12px; font-family: inherit; font-size: 11px;
+            cursor: pointer; text-transform: uppercase; border-radius: 4px;
+            transition: 0.2s;
+        }
+        .btn:hover { background: #fff; color: #000; box-shadow: 0 0 10px #fff; }
+        .btn-green { border-color: #0f0; color: #0f0; }
+        .btn-green:hover { background: #0f0; color: #000; box-shadow: 0 0 10px #0f0; }
+        .btn-rand { width: 100%; margin-top: 5px; background: linear-gradient(90deg, #333, #444); }
+
+        /* Цвета рас */
+        .c-red { color: #ff0055; }
+        .c-green { color: #00ff55; }
+        .c-blue { color: #0055ff; }
+        .c-yellow { color: #ffcc00; }
+
+        #fps-meter {
+            position: absolute; top: 10px; right: 10px;
+            color: #444; font-size: 10px; pointer-events: none;
+        }
+
+        .hint { font-size: 9px; color: #666; margin-top: 5px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="fps-meter">FPS: 60</div>
+
+        <div class="panel" id="settings">
+            <h2>ПАРАМЕТРЫ СРЕДЫ</h2>
+
+            <div class="control-group">
+                <label>Кол-во частиц: <span id="v-count" class="val">1200</span></label>
+                <input type="range" min="200" max="3000" step="100" value="1200" oninput="UI.updCount(this.value)">
+            </div>
+
+            <div class="control-group">
+                <label>Радиус зрения: <span id="v-radius" class="val">80</span></label>
+                <input type="range" min="10" max="200" value="80" oninput="Sim.radius = Number(this.value); UI.updText('radius', this.value)">
+            </div>
+
+            <div class="control-group">
+                <label>Трение (0-1): <span id="v-friction" class="val">0.5</span></label>
+                <input type="range" min="0.01" max="0.99" step="0.01" value="0.5" oninput="Sim.friction = Number(this.value); UI.updText('friction', this.value)">
+            </div>
+
+            <div class="control-group">
+                <label>Сила отталкивания (ближняя): <span id="v-repel" class="val">1.0</span></label>
+                <input type="range" min="0.1" max="5.0" step="0.1" value="1.0" oninput="Sim.beta = Number(this.value); UI.updText('repel', this.value)">
+            </div>
+
+            <h2>МАТРИЦА ВЛИЯНИЯ</h2>
+            <div class="hint">Положительные числа = Притяжение<br>Отрицательные = Отталкивание</div>
+            <br>
+            <div class="matrix-grid" id="matrix-container">
+                <!-- Генерируется JS -->
+            </div>
+
+            <button class="btn btn-rand" onclick="Sim.randomizeRules()">🎲 СЛУЧАЙНЫЕ ПРАВИЛА</button>
+        </div>
+
+        <div class="panel" id="presets">
+            <button class="btn btn-green" onclick="Presets.load('snake')">🐍 ЗМЕИ</button>
+            <button class="btn btn-green" onclick="Presets.load('cell')">🦠 КЛЕТКИ</button>
+            <button class="btn btn-green" onclick="Presets.load('galaxy')">🌌 ГАЛАКТИКИ</button>
+            <button class="btn btn-green" onclick="Presets.load('chaos')">💥 ХАОС</button>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+<script>
+    // --- КОНФИГУРАЦИЯ ---
+    const COLORS = ['#ff0055', '#00ff55', '#0055ff', '#ffcc00']; // R, G, B, Y
+    const TYPES = 4;
+
+    // --- СИМУЛЯТОР ---
+    const Sim = {
+        canvas: document.getElementById('canvas'),
+        ctx: document.getElementById('canvas').getContext('2d', { alpha: false }), // Оптимизация
+        w: 0, h: 0,
+
+        particles: [],
+        count: 1200,
+
+        // Физика
+        radius: 80,    // Радиус взаимодействия
+        friction: 0.5, // Чем меньше, тем больше инерция (0.9 = лед, 0.1 = кисель)
+        beta: 1.0,     // Сила отталкивания при очень близком контакте (чтобы не слипались в точку)
+
+        // Матрица взаимодействий (4x4)
+        // Правило: rules[A][B] = сила, с которой A тянется к B
+        rules: [],
+
+        init() {
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+
+            // Инициализация пустой матрицы
+            for(let i=0; i<TYPES; i++) {
+                this.rules[i] = [];
+                for(let j=0; j<TYPES; j++) {
+                    this.rules[i][j] = 0;
+                }
+            }
+
+            this.createParticles();
+            UI.buildMatrix();
+            Presets.load('snake'); // Старт с пресета
+
+            this.loop = this.loop.bind(this);
+            requestAnimationFrame(this.loop);
+        },
+
+        resize() {
+            this.w = window.innerWidth;
+            this.h = window.innerHeight;
+            this.canvas.width = this.w;
+            this.canvas.height = this.h;
+        },
+
+        createParticles() {
+            this.particles = [];
+            for(let i=0; i<this.count; i++) {
+                this.particles.push({
+                    x: Math.random() * this.w,
+                    y: Math.random() * this.h,
+                    vx: 0,
+                    vy: 0,
+                    type: Math.floor(Math.random() * TYPES) // 0..3
+                });
+            }
+        },
+
+        randomizeRules() {
+            for(let i=0; i<TYPES; i++) {
+                for(let j=0; j<TYPES; j++) {
+                    // Случайное число от -1.0 до 1.0
+                    let val = (Math.random() * 2 - 1).toFixed(2);
+                    this.rules[i][j] = Number(val);
+                }
+            }
+            UI.syncMatrixInputs();
+        },
+
+        // --- ЯДРО ФИЗИКИ (Самое важное) ---
+        update() {
+            const rMax = this.radius;
+            const rMaxSq = rMax * rMax; // Для оптимизации дистанции
+            const forceFactor = 0.5; // Глобальный множитель силы
+
+            for (let i = 0; i < this.particles.length; i++) {
+                let p1 = this.particles[i];
+                let fx = 0;
+                let fy = 0;
+
+                for (let j = 0; j < this.particles.length; j++) {
+                    if (i === j) continue; // Не взаимодействовать с собой
+
+                    let p2 = this.particles[j];
+
+                    let dx = p2.x - p1.x;
+                    let dy = p2.y - p1.y;
+
+                    // Топология тора (бесшовный мир)
+                    if (dx > this.w * 0.5) dx -= this.w;
+                    if (dx < -this.w * 0.5) dx += this.w;
+                    if (dy > this.h * 0.5) dy -= this.h;
+                    if (dy < -this.h * 0.5) dy += this.h;
+
+                    const distSq = dx*dx + dy*dy;
+
+                    // Если частица в радиусе видимости
+                    if (distSq > 0 && distSq < rMaxSq) {
+                        const dist = Math.sqrt(distSq);
+
+                        // F - сила притяжения из матрицы
+                        const g = this.rules[p1.type][p2.type];
+
+                        // Формула силы:
+                        // 1. Если очень близко (< rMax/5) -> Отталкиваемся (анти-слипание)
+                        // 2. Если дальше -> Притягиваемся/Отталкиваемся по правилу G
+
+                        let f = 0;
+                        const minDist = rMax * 0.2; // 20% от радиуса - "личная зона"
+
+                        if (dist < minDist) {
+                            // Сильное отталкивание близко
+                            // f пропорциональна тому, насколько мы близко
+                            const ratio = dist / minDist;
+                            f = this.beta * (ratio - 1); 
+                        } else {
+                            // Обычное взаимодействие (плавный спад)
+                            // Пик силы в середине, 0 на границе радиуса
+                            // Простая линейная интерполяция
+                            const ratio = (dist - minDist) / (rMax - minDist);
+                            // Сила G умножается на параболу или линию.
+                            // Используем простую формулу Life: (1 - ratio) * g
+                            f = g * (1 - Math.abs(2 * ratio - 1)); 
+                            // Или проще:
+                            // f = g * (1/dist); 
+                        }
+
+                        // Применяем силу
+                        fx += (dx / dist) * f * forceFactor;
+                        fy += (dy / dist) * f * forceFactor;
+                    }
+                }
+
+                // Применяем ускорение к скорости
+                p1.vx = (p1.vx + fx) * this.friction;
+                p1.vy = (p1.vy + fy) * this.friction;
+
+                // Обновляем позицию
+                p1.x += p1.vx;
+                p1.y += p1.vy;
+
+                // Границы (Тор)
+                if (p1.x < 0) p1.x += this.w;
+                if (p1.x > this.w) p1.x -= this.w;
+                if (p1.y < 0) p1.y += this.h;
+                if (p1.y > this.h) p1.y -= this.h;
+            }
+        },
+
+        draw() {
+            // "Motion Blur" эффект:
+            // Вместо полной очистки, рисуем полупрозрачный черный прямоугольник.
+            // Старые кадры остаются и медленно гаснут.
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.fillStyle = 'rgba(5, 5, 5, 0.3)'; 
+            this.ctx.fillRect(0, 0, this.w, this.h);
+
+            // Режим наложения для "Свечения"
+            this.ctx.globalCompositeOperation = 'lighter';
+
+            for(let i=0; i<this.particles.length; i++) {
+                let p = this.particles[i];
+                let col = COLORS[p.type];
+
+                this.ctx.fillStyle = col;
+                this.ctx.beginPath();
+                // Маленький размер для производительности, но свечение делает их видимыми
+                this.ctx.arc(p.x, p.y, 2.0, 0, Math.PI*2); 
+                this.ctx.fill();
+            }
+        },
+
+        // Замер FPS
+        lastTime: 0,
+        loop(timestamp) {
+            const dt = timestamp - this.lastTime;
+            if(dt > 0) {
+                document.getElementById('fps-meter').innerText = 'FPS: ' + Math.round(1000/dt);
+            }
+            this.lastTime = timestamp;
+
+            this.update();
+            this.draw();
+            requestAnimationFrame(this.loop);
+        }
+    };
+
+    // --- ИНТЕРФЕЙС ---
+    const UI = {
+        buildMatrix() {
+            const container = document.getElementById('matrix-container');
+            container.innerHTML = '';
+
+            // Заголовки (Типы по X)
+            container.appendChild(this.createEl('div', ''));
+            COLORS.forEach((c, i) => {
+                let el = this.createEl('div', 'T'+(i+1), 'matrix-header');
+                el.style.color = c;
+                container.appendChild(el);
+            });
+
+            // Строки
+            for(let i=0; i<TYPES; i++) {
+                // Лейбл ряда (Тип по Y)
+                let label = this.createEl('div', 'T'+(i+1), 'matrix-row-label');
+                label.style.color = COLORS[i];
+                container.appendChild(label);
+
+                for(let j=0; j<TYPES; j++) {
+                    let cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+
+                    let input = document.createElement('input');
+                    input.type = 'number';
+                    input.step = 0.1;
+                    input.min = -2; input.max = 2;
+                    input.value = Sim.rules[i][j];
+                    input.id = `rule-${i}-${j}`;
+
+                    input.onchange = (e) => {
+                        Sim.rules[i][j] = Number(e.target.value);
+                    };
+
+                    cell.appendChild(input);
+                    container.appendChild(cell);
+                }
+            }
+        },
+
+        createEl(tag, txt, cls) {
+            let e = document.createElement(tag);
+            if(txt) e.innerText = txt;
+            if(cls) e.className = cls;
+            return e;
+        },
+
+        syncMatrixInputs() {
+            for(let i=0; i<TYPES; i++) {
+                for(let j=0; j<TYPES; j++) {
+                    document.getElementById(`rule-${i}-${j}`).value = Sim.rules[i][j];
+                }
+            }
+        },
+
+        updText(id, val) { document.getElementById('v-'+id).innerText = val; },
+
+        updCount(val) {
+            this.updText('count', val);
+            Sim.count = Number(val);
+            Sim.createParticles();
+        }
+    };
+
+    // --- ПРЕСЕТЫ (Самое интересное) ---
+    const Presets = {
+        setParams(rad, fric, beta) {
+            Sim.radius = rad; document.getElementById('v-radius').innerText = rad; document.querySelector('input[oninput*="Sim.radius"]').value = rad;
+            Sim.friction = fric; document.getElementById('v-friction').innerText = fric; document.querySelector('input[oninput*="Sim.friction"]').value = fric;
+            Sim.beta = beta; document.getElementById('v-repel').innerText = beta; document.querySelector('input[oninput*="Sim.beta"]').value = beta;
+        },
+
+        load(name) {
+            // Сброс матрицы
+            for(let i=0; i<TYPES; i++) for(let j=0; j<TYPES; j++) Sim.rules[i][j] = 0;
+
+            if (name === 'snake') {
+                // Красные -> Зеленые -> Синие -> Желтые -> Красные
+                // А догоняет Б, Б убегает от А (но медленнее)
+                this.setParams(80, 0.5, 1.0);
+
+                // Цепочка погони
+                Sim.rules[0][0] = 1.0; Sim.rules[0][1] = 1.0; 
+                Sim.rules[1][1] = 1.0; Sim.rules[1][2] = 1.0; 
+                Sim.rules[2][2] = 1.0; Sim.rules[2][3] = 1.0;
+                Sim.rules[3][3] = 1.0; Sim.rules[3][0] = 1.0;
+
+                // Немного страха чтобы не слипались в ком
+                Sim.rules[0][2] = -0.5;
+                Sim.rules[1][3] = -0.5;
+            }
+
+            else if (name === 'cell') {
+                // Образование "клеток". Свои притягиваются, чужие сильно отталкиваются
+                this.setParams(60, 0.15, 2.0); // Высокое трение (кисель)
+                for(let i=0; i<TYPES; i++) {
+                    for(let j=0; j<TYPES; j++) {
+                        if (i === j) Sim.rules[i][j] = 0.8; // Любовь к своим
+                        else Sim.rules[i][j] = -0.6;        // Ненависть к чужим
+                    }
+                }
+            }
+
+            else if (name === 'galaxy') {
+                // Все притягиваются ко всем, создавая вращающийся вихрь (из-за ошибки округления и трения)
+                this.setParams(150, 0.5, 5.0); // Большой радиус
+                for(let i=0; i<TYPES; i++) {
+                    for(let j=0; j<TYPES; j++) {
+                        Sim.rules[i][j] = 0.5;
+                    }
+                }
+                // Асимметрия для вращения
+                Sim.rules[0][1] = 1.0;
+                Sim.rules[1][0] = 0.2;
+            }
+
+            else if (name === 'chaos') {
+                this.setParams(100, 0.6, 1.0);
+                Sim.randomizeRules();
+            }
+
+            UI.syncMatrixInputs();
+            Sim.createParticles(); // Рестарт позиций
+        }
+    };
+
+    Sim.init();
+</script>
+</body>
+</html>
