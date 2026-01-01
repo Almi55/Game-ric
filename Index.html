@@ -3,449 +3,468 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Age of Strategy</title>
+    <title>Age of Dominion</title>
     <style>
-        /* --- НАСТРОЙКИ СТИЛЯ (Под Age of History) --- */
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto:wght@400;700&display=swap');
+
         :root {
-            --bg-color: #1a1a1d;
-            --panel-color: #2b2b2e;
-            --accent-color: #d4af37; /* Золотой */
-            --text-color: #e0e0e0;
-            --player-color: #4caf50; /* Зеленый */
-            --enemy-color: #f44336;  /* Красный */
-            --neutral-color: #607d8b; /* Серый */
+            --bg-ocean: #1e2124;
+            --land-neutral: #36393f;
+            --land-player: #2e7d32;
+            --land-enemy: #c62828;
+            --ui-bg: rgba(20, 20, 20, 0.95);
+            --gold: #ffd700;
+            --text-main: #ffffff;
+            --border-color: #000000;
         }
 
         body {
             margin: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden; /* Блокируем прокрутку страницы */
-            user-select: none; /* Запрет выделения текста на iPhone */
+            padding: 0;
+            background-color: var(--bg-ocean);
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+            color: var(--text-main);
+            user-select: none;
             -webkit-user-select: none;
-            touch-action: manipulation;
         }
 
-        /* --- ВЕРХНЯЯ ПАНЕЛЬ (Ресурсы) --- */
-        #top-bar {
+        /* --- ВЕРХНЯЯ ПАНЕЛЬ СТАТИСТИКИ --- */
+        #top-hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: var(--ui-bg);
+            border-bottom: 2px solid #444;
             display: flex;
-            justify-content: space-between;
-            padding: 10px 15px;
-            background: var(--panel-color);
-            border-bottom: 2px solid #000;
-            font-weight: bold;
-            font-size: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-
-        .resource {
-            display: flex;
+            justify-content: space-around;
             align-items: center;
-            gap: 5px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        .gold { color: var(--accent-color); }
-        .turn { color: #fff; }
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #aaa;
+        }
 
-        /* --- КАРТА (Игровое поле) --- */
-        #game-map {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr); /* 5 колонок */
-            gap: 4px;
-            padding: 10px;
-            height: calc(100vh - 140px); /* Высота экрана минус панели */
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            font-family: 'Cinzel', serif;
+        }
+
+        .gold-txt { color: var(--gold); text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); }
+
+        /* --- ИГРОВАЯ КАРТА --- */
+        #map-container {
+            margin-top: 70px; /* Отступ от хедера */
+            height: calc(100vh - 160px);
             overflow-y: auto;
-            align-content: start;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 10px;
+        }
+
+        #game-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4 колонки для крупных клеток */
+            gap: 6px;
+            width: 100%;
+            max-width: 500px;
         }
 
         .province {
-            aspect-ratio: 1; /* Квадратные провинции */
-            background-color: var(--neutral-color);
-            border: 1px solid #000;
-            border-radius: 4px;
+            aspect-ratio: 1;
+            background-color: var(--land-neutral);
+            border: 2px solid #222;
+            border-radius: 8px;
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            font-size: 10px;
-            position: relative;
-            transition: transform 0.1s;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
         }
 
-        .province:active {
-            transform: scale(0.95);
-        }
+        .province.player { background: linear-gradient(135deg, #1b5e20, #2e7d32); border-color: #4caf50; }
+        .province.enemy { background: linear-gradient(135deg, #b71c1c, #d32f2f); border-color: #ff5252; }
 
-        /* Цвета владельцев */
-        .province.player { background-color: var(--player-color); border: 2px solid #2e7d32; }
-        .province.enemy { background-color: var(--enemy-color); border: 2px solid #c62828; }
-        .province.selected { 
-            border: 3px solid #fff; 
+        .province.selected {
+            transform: scale(1.05);
+            border: 3px solid #fff;
+            box-shadow: 0 0 15px rgba(255,255,255,0.6);
             z-index: 10;
-            box-shadow: 0 0 15px rgba(255,255,255,0.5);
         }
 
-        .army-count {
-            font-weight: bold;
+        .army-icon { font-size: 20px; margin-bottom: 2px; }
+        .army-num { font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px black; }
+
+        /* Иконка столицы */
+        .capital::after {
+            content: "★";
+            position: absolute;
+            top: 2px;
+            right: 5px;
+            color: gold;
             font-size: 14px;
-            text-shadow: 1px 1px 0 #000;
         }
 
-        /* --- НИЖНЯЯ ПАНЕЛЬ (Действия) --- */
-        #bottom-bar {
+        /* --- НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ --- */
+        #bottom-hud {
             position: fixed;
             bottom: 0;
+            left: 0;
             width: 100%;
-            height: 80px;
-            background: var(--panel-color);
-            border-top: 2px solid #000;
+            height: 90px;
+            background: var(--ui-bg);
+            border-top: 2px solid #444;
             display: flex;
-            justify-content: space-around;
+            justify-content: space-evenly;
             align-items: center;
-            padding-bottom: 10px; /* Учет полоски iPhone */
+            z-index: 100;
+            padding-bottom: 15px; /* Для iPhone */
         }
 
-        button {
-            background: #3e3e42;
-            color: white;
+        .btn {
+            background: #333;
+            color: #fff;
             border: 1px solid #555;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 12px;
-            text-transform: uppercase;
+            padding: 10px 0;
+            width: 30%;
+            border-radius: 8px;
+            font-family: 'Roboto', sans-serif;
             font-weight: bold;
+            font-size: 13px;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.2s;
         }
 
-        button:active { background: #555; }
+        .btn:active { transform: translateY(2px); }
+        .btn-green { background: #1b5e20; border-color: #2e7d32; }
+        .btn-red { background: #b71c1c; border-color: #d32f2f; }
+        .btn-gold { background: #f57f17; border-color: #fbc02d; color: #000; }
 
-        #btn-next-turn {
-            background: var(--accent-color);
-            color: #000;
-            border: 1px solid #bfa030;
-        }
+        .btn:disabled { opacity: 0.3; filter: grayscale(100%); }
 
-        /* Модальное окно (сообщения) */
-        #message-area {
-            position: absolute;
-            top: 50px;
+        /* Всплывающие сообщения */
+        .toast {
+            position: fixed;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            padding: 5px 10px;
-            border-radius: 10px;
-            font-size: 12px;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 16px;
+            border: 1px solid #555;
             opacity: 0;
-            transition: opacity 0.5s;
             pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 200;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
-    <!-- Верхняя панель -->
-    <div id="top-bar">
-        <div class="resource">👑 <span id="ui-pop">Игрок</span></div>
-        <div class="resource gold">💰 <span id="ui-gold">100</span></div>
-        <div class="resource turn">Ход: <span id="ui-turn">1</span></div>
+    <!-- ВЕРХ -->
+    <div id="top-hud">
+        <div class="stat-box">
+            <span class="stat-value gold-txt" id="ui-gold">0</span>
+            <span>Казна</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-value" id="ui-turn">1</span>
+            <span>Ход</span>
+        </div>
+        <div class="stat-box">
+            <span class="stat-value" id="ui-provinces">1</span>
+            <span>Земли</span>
+        </div>
     </div>
 
-    <!-- Область уведомлений -->
-    <div id="message-area">Ход сделан</div>
-
-    <!-- Карта -->
-    <div id="game-map">
-        <!-- Провинции создаются JS-кодом -->
+    <!-- КАРТА -->
+    <div id="map-container">
+        <div id="game-grid"></div>
     </div>
 
-    <!-- Нижняя панель действий -->
-    <div id="bottom-bar">
-        <button id="btn-recruit" onclick="recruitArmy()">Нанять (+5)</button>
-        <button id="btn-attack" onclick="attackProvince()" style="display:none;">Атака</button>
-        <button id="btn-next-turn" onclick="nextTurn()">След. Ход</button>
+    <!-- УВЕДОМЛЕНИЕ -->
+    <div id="toast" class="toast">Игра началась</div>
+
+    <!-- НИЗ (КНОПКИ) -->
+    <div id="bottom-hud">
+        <button class="btn btn-green" id="btn-recruit" onclick="recruit()">
+            <span>🛡 Нанять</span>
+            <span style="font-size:10px; opacity:0.8;">15 монет</span>
+        </button>
+
+        <button class="btn btn-red" id="btn-attack" onclick="attack()" disabled>
+            <span>⚔️ Атака</span>
+            <span style="font-size:10px; opacity:0.8;">Выбери цель</span>
+        </button>
+
+        <button class="btn btn-gold" onclick="nextTurn()">
+            <span>⏳ След. Ход</span>
+            <span style="font-size:10px; opacity:0.8;">+Доход</span>
+        </button>
     </div>
 
     <script>
-        // --- ЛОГИКА ИГРЫ ---
+        // --- КОНФИГУРАЦИЯ ИГРЫ ---
+        const GRID_SIZE = 16; // 4x4 карта
+        const RECRUIT_COST = 15;
+        const INCOME_PER_LAND = 10;
 
-        // Настройки игры
-        const MAP_SIZE = 25; // 5x5
-        const RECRUIT_COST = 10;
-        const INCOME_PER_PROVINCE = 5;
-
-        // Состояние игры
-        let gameData = {
-            gold: 150,
+        let gameState = {
+            gold: 100,
             turn: 1,
-            provinces: [] 
+            selected: null, // Индекс выбранной клетки
+            lands: []
         };
 
-        let selectedProvinceIndex = null;
+        const mapEl = document.getElementById('game-grid');
+        const uiGold = document.getElementById('ui-gold');
+        const uiTurn = document.getElementById('ui-turn');
+        const uiProv = document.getElementById('ui-provinces');
+        const btnRecruit = document.getElementById('btn-recruit');
+        const btnAttack = document.getElementById('btn-attack');
+        const toastEl = document.getElementById('toast');
 
-        // Инициализация (старт)
-        function initGame() {
-            loadGame(); // Пытаемся загрузить сохранение
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+        function init() {
+            // Генерация данных карты
+            for(let i=0; i<GRID_SIZE; i++) {
+                let owner = 'neutral';
+                let army = Math.floor(Math.random() * 5) + 1;
 
-            // Если провинций нет (новая игра), создаем карту
-            if (gameData.provinces.length === 0) {
-                generateMap();
+                // Игрок сверху слева
+                if(i === 0) { owner = 'player'; army = 10; }
+                // Враг снизу справа
+                if(i === GRID_SIZE - 1) { owner = 'enemy'; army = 10; }
+
+                gameState.lands.push({ id: i, owner: owner, army: army });
             }
-
             renderMap();
             updateUI();
         }
 
-        // Генерация карты
-        function generateMap() {
-            for (let i = 0; i < MAP_SIZE; i++) {
-                let owner = 'neutral';
-                let army = Math.floor(Math.random() * 5); // Случайная армия нейтралов
-
-                // Игрок стартует в левом верхнем углу (0)
-                if (i === 0) {
-                    owner = 'player';
-                    army = 10;
-                }
-                // Враг стартует в правом нижнем (24)
-                if (i === MAP_SIZE - 1) {
-                    owner = 'enemy';
-                    army = 10;
-                }
-
-                gameData.provinces.push({
-                    id: i,
-                    owner: owner,
-                    army: army
-                });
-            }
-        }
-
-        // Отрисовка карты
+        // --- ОТРИСОВКА КАРТЫ ---
         function renderMap() {
-            const mapDiv = document.getElementById('game-map');
-            mapDiv.innerHTML = ''; // Очистка
+            mapEl.innerHTML = '';
+            gameState.lands.forEach((land, idx) => {
+                const div = document.createElement('div');
+                div.className = `province ${land.owner}`;
+                if(idx === 0) div.classList.add('capital'); // Простая логика столицы
 
-            gameData.provinces.forEach((prov, index) => {
-                const el = document.createElement('div');
-                el.className = `province ${prov.owner}`;
-                if (selectedProvinceIndex === index) el.classList.add('selected');
+                if(gameState.selected === idx) div.classList.add('selected');
 
-                // Иконка замка или меча
-                let icon = '';
-                if(prov.owner === 'player') icon = '♜';
-                else if(prov.owner === 'enemy') icon = '⚔️';
+                // Иконка
+                let icon = '🌲';
+                if(land.owner === 'player') icon = '🛡';
+                if(land.owner === 'enemy') icon = '☠️';
 
-                el.innerHTML = `
-                    <div>${icon}</div>
-                    <div class="army-count">${prov.army}</div>
+                div.innerHTML = `
+                    <div class="army-icon">${icon}</div>
+                    <div class="army-num">${land.army}</div>
                 `;
 
-                el.onclick = () => selectProvince(index);
-                mapDiv.appendChild(el);
+                div.onclick = () => selectLand(idx);
+                mapEl.appendChild(div);
             });
         }
 
-        // Выбор провинции
-        function selectProvince(index) {
-            selectedProvinceIndex = index;
-            renderMap(); // Перерисовать чтобы показать выделение
+        // --- ЛОГИКА ВЫБОРА ---
+        function selectLand(idx) {
+            gameState.selected = idx;
+            renderMap();
+            checkButtons(idx);
+        }
 
-            // Логика кнопок
-            const prov = gameData.provinces[index];
-            const btnRecruit = document.getElementById('btn-recruit');
-            const btnAttack = document.getElementById('btn-attack');
+        function checkButtons(idx) {
+            const land = gameState.lands[idx];
 
-            if (prov.owner === 'player') {
-                btnRecruit.style.display = 'block';
-                btnAttack.style.display = 'none';
-                btnRecruit.innerText = `Нанять 5 (${RECRUIT_COST}💰)`;
+            // Кнопка найма: только на своей земле
+            if(land.owner === 'player') {
+                btnRecruit.disabled = false;
+                btnRecruit.style.opacity = "1";
+                btnAttack.disabled = true;
+                btnAttack.innerHTML = `<span>⚔️ Атака</span><span style="font-size:10px">Это твое</span>`;
             } else {
-                btnRecruit.style.display = 'none';
+                btnRecruit.disabled = true;
 
-                // Проверяем, есть ли рядом наша провинция для атаки
-                if (canAttack(index)) {
-                    btnAttack.style.display = 'block';
+                // Кнопка атаки: доступна, если рядом есть наша армия
+                if(canAttack(idx)) {
+                    btnAttack.disabled = false;
+                    btnAttack.innerHTML = `<span>⚔️ Атака</span><span style="font-size:10px">В бой!</span>`;
                 } else {
-                    btnAttack.style.display = 'none';
+                    btnAttack.disabled = true;
+                    btnAttack.innerHTML = `<span>⚔️ Атака</span><span style="font-size:10px">Далеко</span>`;
                 }
             }
         }
 
-        // Проверка соседей (можно ли атаковать)
-        function canAttack(targetIndex) {
-            // Простая логика сетки 5x5
-            const neighbors = [
-                targetIndex - 1, targetIndex + 1, // Слева, Справа
-                targetIndex - 5, targetIndex + 5  // Сверху, Снизу
-            ];
+        function canAttack(targetIdx) {
+            // Проверка соседей (верх, низ, лево, право) для сетки 4х4
+            const neighbors = [targetIdx-1, targetIdx+1, targetIdx-4, targetIdx+4];
 
-            // Проверяем каждого соседа
-            for (let n of neighbors) {
-                // Проверка границ, чтобы не прыгало через край
-                if (n >= 0 && n < MAP_SIZE) {
-                     // Исправление бага "телепорт через край строки"
-                    if (targetIndex % 5 === 0 && n === targetIndex - 1) continue; // Левый край
-                    if (targetIndex % 5 === 4 && n === targetIndex + 1) continue; // Правый край
+            for(let n of neighbors) {
+                if(n >= 0 && n < GRID_SIZE) {
+                    // Убираем прыжки через край строки
+                    if(targetIdx % 4 === 0 && n === targetIdx - 1) continue;
+                    if(targetIdx % 4 === 3 && n === targetIdx + 1) continue;
 
-                    if (gameData.provinces[n].owner === 'player') {
-                        return true; // Нашли соседнюю нашу провинцию
+                    // Если рядом наша провинция и там есть армия > 1
+                    if(gameState.lands[n].owner === 'player' && gameState.lands[n].army > 1) {
+                        return true;
                     }
                 }
             }
             return false;
         }
 
-        // Наем войск
-        function recruitArmy() {
-            if (selectedProvinceIndex === null) return;
-            const prov = gameData.provinces[selectedProvinceIndex];
+        // --- ДЕЙСТВИЯ ---
+        function recruit() {
+            if(gameState.selected === null) return;
+            const land = gameState.lands[gameState.selected];
 
-            if (prov.owner === 'player') {
-                if (gameData.gold >= RECRUIT_COST) {
-                    gameData.gold -= RECRUIT_COST;
-                    prov.army += 5;
-                    updateUI();
-                    renderMap();
-                    saveGame();
-                    showMessage("-10 монет");
-                } else {
-                    showMessage("Не хватает золота!");
-                }
+            if(gameState.gold >= RECRUIT_COST) {
+                gameState.gold -= RECRUIT_COST;
+                land.army += 5;
+                showToast("Армия пополнена!");
+                renderMap();
+                updateUI();
+            } else {
+                showToast("Не хватает золота!");
             }
         }
 
-        // Атака
-        function attackProvince() {
-            if (selectedProvinceIndex === null) return;
-            const target = gameData.provinces[selectedProvinceIndex];
+        function attack() {
+            if(gameState.selected === null) return;
+            const target = gameState.lands[gameState.selected];
 
-            // Ищем самую сильную соседнюю провинцию игрока для атаки
-            let attackerIndex = -1;
-            let maxArmy = 0;
-
-            const neighbors = [selectedProvinceIndex-1, selectedProvinceIndex+1, selectedProvinceIndex-5, selectedProvinceIndex+5];
+            // Найти лучшую провинцию для атаки (откуда бьем)
+            let attackerIdx = -1;
+            let maxPower = 0;
+            const neighbors = [gameState.selected-1, gameState.selected+1, gameState.selected-4, gameState.selected+4];
 
             neighbors.forEach(n => {
-                 if (n >= 0 && n < MAP_SIZE) {
-                    if (selectedProvinceIndex % 5 === 0 && n === selectedProvinceIndex - 1) return;
-                    if (selectedProvinceIndex % 5 === 4 && n === selectedProvinceIndex + 1) return;
+                if(n >= 0 && n < GRID_SIZE) {
+                    if(gameState.selected % 4 === 0 && n === gameState.selected - 1) return;
+                    if(gameState.selected % 4 === 3 && n === gameState.selected + 1) return;
 
-                    if (gameData.provinces[n].owner === 'player') {
-                        if (gameData.provinces[n].army > maxArmy) {
-                            maxArmy = gameData.provinces[n].army;
-                            attackerIndex = n;
-                        }
+                    if(gameState.lands[n].owner === 'player' && gameState.lands[n].army > maxPower) {
+                        maxPower = gameState.lands[n].army;
+                        attackerIdx = n;
                     }
-                 }
+                }
             });
 
-            if (attackerIndex !== -1 && maxArmy > 1) {
-                // Бой!
-                const attacker = gameData.provinces[attackerIndex];
-
-                // Простая формула боя
-                if (attacker.army > target.army) {
-                    // Победа
-                    const remaining = attacker.army - target.army;
+            if(attackerIdx !== -1) {
+                const attacker = gameState.lands[attackerIdx];
+                // Бой
+                if(attacker.army > target.army) {
+                    const loss = target.army;
                     target.owner = 'player';
-                    target.army = remaining - 1; // Потери при захвате
-                    attacker.army = 1; // Гарнизон остается
-                    showMessage("ПОБЕДА!");
+                    target.army = attacker.army - loss - 1; // Наши потери + гарнизон
+                    attacker.army = 1; // Остается гарнизон
+                    showToast("ПОБЕДА! Провинция захвачена.");
                 } else {
-                    // Поражение
-                    target.army -= Math.floor(attacker.army / 2); // Враг несет потери
+                    target.army -= Math.floor(attacker.army / 1.5); // Враг теряет часть
                     attacker.army = 1;
-                    showMessage("Поражение...");
+                    showToast("Поражение... Наши войска погибли.");
                 }
-
                 renderMap();
-                selectProvince(selectedProvinceIndex); // Обновить кнопки
-                saveGame();
-            } else {
-                showMessage("Нужна армия > 1 рядом!");
+                updateUI();
+                selectLand(gameState.selected); // Обновить кнопки
             }
         }
 
-        // Следующий ход
         function nextTurn() {
-            gameData.turn++;
+            gameState.turn++;
 
-            // 1. Доход
+            // 1. Сбор налогов
             let income = 0;
-            let playerProvinces = 0;
-            gameData.provinces.forEach(p => {
-                if (p.owner === 'player') {
-                    income += INCOME_PER_PROVINCE;
-                    playerProvinces++;
+            let myLands = 0;
+            gameState.lands.forEach(l => {
+                if(l.owner === 'player') {
+                    income += INCOME_PER_LAND;
+                    myLands++;
                 }
-                // Небольшой рост населения/армии у всех
-                if (Math.random() > 0.8) p.army += 1;
             });
-            gameData.gold += income;
+            gameState.gold += income;
 
             // 2. Ход врага (ИИ)
             enemyAI();
 
-            // Проверка победы
-            if (playerProvinces === MAP_SIZE) alert("ТЫ ЗАХВАТИЛ МИР!");
-            if (playerProvinces === 0) alert("Тебя уничтожили...");
-
+            // 3. Обновление
             updateUI();
             renderMap();
-            saveGame();
-            showMessage(`Ход ${gameData.turn}: +${income} золота`);
+            showToast(`Ход ${gameState.turn}. Доход: +${income}💰`);
+
+            // Проверка победы/поражения
+            if(myLands === GRID_SIZE) alert("ВЕСЬ МИР ТВОЙ! ПОБЕДА!");
+            if(myLands === 0) alert("Твое королевство пало...");
         }
 
-        // Примитивный ИИ врага
         function enemyAI() {
-            gameData.provinces.forEach((prov, idx) => {
-                if (prov.owner === 'enemy') {
-                    // Если золота нет у ИИ (упростим), он просто рекрутирует иногда
-                    if (Math.random() > 0.7) prov.army += 3;
+            gameState.lands.forEach((land, idx) => {
+                if(land.owner === 'enemy') {
+                    // ИИ нанимает войска, если армия маленькая
+                    if(land.army < 5) land.army += 3;
+                    else land.army += 1; // Медленный рост
 
-                    // Атака игрока, если рядом
-                    const neighbors = [idx-1, idx+1, idx-5, idx+5];
-                    neighbors.forEach(n => {
-                        if (n >= 0 && n < MAP_SIZE && gameData.provinces[n]) {
-                            if (gameData.provinces[n].owner === 'player' && prov.army > gameData.provinces[n].army + 2) {
-                                // Атака ИИ
-                                gameData.provinces[n].owner = 'enemy';
-                                gameData.provinces[n].army = prov.army - gameData.provinces[n].army;
-                                prov.army = 1;
+                    // Простая атака соседа
+                    const neighbors = [idx-1, idx+1, idx-4, idx+4];
+                    for(let n of neighbors) {
+                        if(n >= 0 && n < GRID_SIZE && gameState.lands[n]) {
+                            // Не атакует своих
+                            if(gameState.lands[n].owner !== 'enemy') {
+                                // Если у врага больше армии чем у соседа
+                                if(land.army > gameState.lands[n].army + 2) {
+                                    gameState.lands[n].owner = 'enemy';
+                                    gameState.lands[n].army = land.army - gameState.lands[n].army;
+                                    land.army = 1;
+                                    // Если захватил землю игрока - уведомление
+                                    if(gameState.lands[n].owner === 'player') showToast("Враг захватил вашу землю!");
+                                    break; // Одна атака за ход с клетки
+                                }
                             }
                         }
-                    });
+                    }
                 }
             });
         }
 
         function updateUI() {
-            document.getElementById('ui-gold').innerText = gameData.gold;
-            document.getElementById('ui-turn').innerText = gameData.turn;
+            uiGold.innerText = gameState.gold;
+            uiTurn.innerText = gameState.turn;
+            const count = gameState.lands.filter(l => l.owner === 'player').length;
+            uiProv.innerText = count;
         }
 
-        function showMessage(text) {
-            const el = document.getElementById('message-area');
-            el.innerText = text;
-            el.style.opacity = 1;
-            setTimeout(() => el.style.opacity = 0, 1500);
+        function showToast(msg) {
+            toastEl.innerText = msg;
+            toastEl.style.opacity = 1;
+            setTimeout(() => toastEl.style.opacity = 0, 2000);
         }
 
-        // --- СОХРАНЕНИЯ ---
-        function saveGame() {
-            localStorage.setItem('ageOfStrategySave', JSON.stringify(gameData));
-        }
-
-        function loadGame() {
-            const save = localStorage.getItem('ageOfStrategySave');
-            if (save) {
-                gameData = JSON.parse(save);
-            }
-        }
-
-        // Запуск
-        initGame();
+        // Старт
+        init();
 
     </script>
 </body>
