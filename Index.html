@@ -2,612 +2,368 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ETERNA-QUEST: Fixed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ball Escape Challenge</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
         body {
             margin: 0;
             background-color: #000;
+            color: white;
             overflow: hidden;
-            font-family: 'Press Start 2P', monospace;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        #game-container {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
-            background: #111;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
         }
 
         canvas {
-            display: block;
-            image-rendering: pixelated;
+            box-shadow: 0 0 50px rgba(255, 50, 50, 0.2);
+            border-radius: 50%;
         }
 
-        /* ИНТЕРФЕЙС */
-        .ui-layer {
+        #ui {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            bottom: 50px;
+            text-align: center;
             pointer-events: none;
             z-index: 10;
         }
 
-        /* HUD */
-        .hud-panel {
-            display: flex;
-            padding: 10px;
-            gap: 10px;
+        #timer {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #fff;
         }
 
-        .portrait {
-            width: 48px; height: 48px;
-            background: #3e2723;
-            border: 2px solid #ffd700;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px;
-        }
-
-        .bars { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; max-width: 200px; }
-        .bar-bg { width: 100%; height: 12px; background: #222; border: 2px solid #000; }
-        .bar-fill { height: 100%; transition: width 0.1s; }
-        .hp { background: #d32f2f; }
-
-        .stats { color: #ffd700; font-size: 10px; margin-top: 5px; text-shadow: 1px 1px 0 #000; }
-
-        /* МЕНЮ */
-        .menu-overlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            z-index: 20;
-            pointer-events: auto;
-        }
-
-        .menu-box {
-            background: #2d2d2d;
-            border: 4px solid #ffd700;
-            padding: 20px;
-            text-align: center;
-            color: white;
-            width: 300px;
-            box-shadow: 0 0 30px rgba(0,0,0,0.8);
-        }
-
-        .btn {
-            background: #5d4037;
-            color: #ffd700;
-            border: 2px solid #3e2723;
-            padding: 15px;
-            width: 100%;
+        #status {
+            font-size: 18px;
+            color: #aaa;
             margin-top: 10px;
-            font-family: inherit;
-            font-size: 14px;
-            text-transform: uppercase;
-            cursor: pointer;
         }
-        .btn:active { transform: scale(0.98); background: #4e342e; }
 
-        /* СЕНСОРНОЕ УПРАВЛЕНИЕ */
-        #mobile-controls {
+        #restart-btn {
             position: absolute;
-            bottom: 20px; left: 0;
-            width: 100%;
-            height: 140px;
-            padding: 0 20px;
-            box-sizing: border-box;
-            display: none; /* JS включит */
-            justify-content: space-between;
-            align-items: flex-end;
-            z-index: 15;
-            pointer-events: none; /* Пропускаем клики сквозь пустоту */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 24px;
+            background: white;
+            color: black;
+            border: none;
+            cursor: pointer;
+            border-radius: 30px;
+            display: none;
+            pointer-events: auto;
+            z-index: 20;
+            font-family: inherit;
+            font-weight: bold;
         }
 
-        .control-group { pointer-events: auto; display: flex; gap: 15px; }
-
-        .t-btn {
-            width: 70px; height: 70px;
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px;
-            color: rgba(255,255,255,0.7);
-            user-select: none;
+        #restart-btn:hover {
+            background: #ddd;
         }
-        .t-btn:active { background: rgba(255,215,0,0.3); border-color: #ffd700; color: #fff; }
-        .btn-atk { width: 80px; height: 80px; border-radius: 15px; background: rgba(200,50,50,0.2); border-color: #ef5350; }
-
     </style>
 </head>
 <body>
 
-<div id="game-container">
+    <div id="ui">
+        <div id="timer">100.00</div>
+        <div id="status">Мяч должен сбежать!</div>
+    </div>
+
+    <button id="restart-btn" onclick="Game.restart()">ПОВТОРИТЬ</button>
     <canvas id="gameCanvas"></canvas>
 
-    <div class="ui-layer">
-        <div class="hud-panel">
-            <div class="portrait">🛡️</div>
-            <div class="bars">
-                <div class="bar-bg"><div id="hp-bar" class="bar-fill hp" style="width: 100%;"></div></div>
-                <div class="stats">
-                    LVL <span id="ui-lvl">1</span> | 💰 <span id="ui-gold">0</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ГЛАВНОЕ МЕНЮ -->
-    <div id="main-menu" class="menu-overlay">
-        <div class="menu-box">
-            <h1 style="color:#ffd700; margin:0 0 10px 0;">ETERNA QUEST</h1>
-            <p style="font-size:10px; color:#aaa;">PIXEL DUNGEON CRAWLER</p>
-            <button class="btn" onclick="Game.startNewGame()">НОВАЯ ИГРА</button>
-        </div>
-    </div>
-
-    <!-- МЕНЮ ПРИВАЛА -->
-    <div id="rest-menu" class="menu-overlay" style="display:none;">
-        <div class="menu-box">
-            <h2>УРОВЕНЬ ЗАЧИЩЕН</h2>
-            <p>Золото: <span id="rest-gold" style="color:#ffd700">0</span></p>
-            <hr style="border-color:#444; margin: 15px 0;">
-            <button class="btn" onclick="Game.buyHeal()">ЛЕЧЕНИЕ (50$)</button>
-            <button class="btn" onclick="Game.buyDmg()">УРОН + (100$)</button>
-            <button class="btn" style="background:#2e7d32; color:#fff;" onclick="Game.nextLevel()">СЛЕДУЮЩИЙ УРОВЕНЬ</button>
-        </div>
-    </div>
-
-    <!-- МЕНЮ СМЕРТИ -->
-    <div id="death-menu" class="menu-overlay" style="display:none;">
-        <div class="menu-box" style="border-color:#d32f2f;">
-            <h2 style="color:#d32f2f">ВЫ ПОГИБЛИ</h2>
-            <button class="btn" onclick="location.reload()">В МЕНЮ</button>
-        </div>
-    </div>
-
-    <!-- СЕНСОРЫ -->
-    <div id="mobile-controls">
-        <div class="control-group">
-            <div class="t-btn" id="btn-l">⬅️</div>
-            <div class="t-btn" id="btn-r">➡️</div>
-        </div>
-        <div class="control-group">
-            <div class="t-btn btn-atk" id="btn-atk">⚔️</div>
-            <div class="t-btn" id="btn-j">⬆️</div>
-        </div>
-    </div>
-</div>
-
 <script>
-/* --- ДВИЖОК --- */
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-// Настройки
-const TILE = 40;
-const GRAVITY = 0.8;
-const SPEED = 6;
-const JUMP = 15;
-
-// Состояние
-let W, H;
-const keys = { l: false, r: false, u: false, atk: false };
-
-// --- ГРАФИКА (ПРОГРАММНЫЕ СПРАЙТЫ) ---
-const Art = {
-    rect: (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.floor(x), Math.floor(y), w, h); },
-
-    // Стена
-    wall: (x, y) => {
-        Art.rect(x, y, TILE, TILE, '#4e342e'); // Темно-коричневый
-        Art.rect(x, y, TILE, 2, '#6d4c41'); // Светлый верх
-        Art.rect(x+10, y, 2, TILE, '#3e2723'); // Шов
-        Art.rect(x, y+20, TILE, 2, '#3e2723'); // Шов гор.
-        // Декор
-        if ((x+y)%3 === 0) Art.rect(x+5, y+5, 4, 4, '#5d4037');
-    },
-
-    // Рыцарь
-    player: (x, y, dir, isAtk) => {
-        const c = '#90a4ae'; // Броня
-        const c2 = '#1976d2'; // Ткань
-
-        // Тело
-        Art.rect(x+8, y+10, 24, 20, c);
-        Art.rect(x+12, y+14, 16, 12, c2); // Нагрудник
-
-        // Голова
-        Art.rect(x+10, y, 20, 10, c);
-        Art.rect(x+20 + (dir*4), y+2, 6, 2, '#000'); // Глаза
-
-        // Ноги
-        Art.rect(x+10, y+30, 8, 10, '#37474f');
-        Art.rect(x+22, y+30, 8, 10, '#37474f');
-
-        // Оружие
-        if (isAtk) {
-            // Удар
-            ctx.fillStyle = '#fff';
-            let sx = dir===1 ? x+30 : x-30;
-            ctx.beginPath();
-            ctx.arc(x+20, y+20, 35, 0, Math.PI*2);
-            ctx.globalAlpha = 0.5;
-            ctx.fill();
-            ctx.globalAlpha = 1.0;
-            Art.rect(sx, y+15, 30, 6, '#fff'); // Меч
-        } else {
-            // В руке
-            let sx = dir===1 ? x+26 : x-6;
-            Art.rect(sx, y+12, 4, 16, '#cfd8dc');
-        }
-    },
-
-    // Враг
-    enemy: (x, y, type, dir) => {
-        if(type === 1) { // Слизень
-            Art.rect(x+2, y+15, 36, 25, '#76ff03');
-            Art.rect(x+8 + (dir*4), y+20, 6, 6, '#000');
-            Art.rect(x+20 + (dir*4), y+20, 6, 6, '#000');
-        } else { // Скелет
-            Art.rect(x+10, y+5, 20, 35, '#eee');
-            Art.rect(x+14 + (dir*2), y+10, 4, 4, '#000');
-            Art.rect(x+22 + (dir*2), y+10, 4, 4, '#000');
-            // Меч скелета
-            Art.rect(x + (dir===1?25:-5), y+20, 20, 4, '#bdbdbd');
-        }
-    },
-
-    door: (x, y) => {
-        Art.rect(x, y, 40, 60, '#000');
-        Art.rect(x-4, y, 4, 60, '#5d4037'); // Рамка
-        Art.rect(x+40, y, 4, 60, '#5d4037');
-        Art.rect(x+5, y+5, 30, 50, '#7b1fa2'); // Портал
-    }
-};
-
-/* --- ИГРА --- */
-const Game = {
-    running: false,
-    level: 1,
-    map: [],
-    mapW: 0, mapH: 15,
-    camX: 0,
-
-    entities: [],
-
-    player: { x: 100, y: 100, w: 30, h: 40, vx: 0, vy: 0, hp: 100, maxHp: 100, gold: 0, dmg: 10, dir: 1, atkCd: 0, iFrame: 0 },
-    door: null,
-
-    // Запуск новой игры
-    startNewGame: function() {
-        this.player.hp = 100;
-        this.player.gold = 0;
-        this.level = 1;
-        this.player.dmg = 10;
-        this.loadLevel();
-    },
-
-    nextLevel: function() {
-        this.level++;
-        this.loadLevel();
-    },
-
-    loadLevel: function() {
-        // Сброс UI
-        document.querySelectorAll('.menu-overlay').forEach(e => e.style.display = 'none');
-        this.resize();
-
-        // Генерация
-        this.genMap();
-        this.running = true;
-        this.loop();
-    },
-
-    resize: function() {
-        W = window.innerWidth;
-        H = window.innerHeight;
-        canvas.width = W;
-        canvas.height = H;
-        ctx.imageSmoothingEnabled = false;
-    },
-
-    genMap: function() {
-        this.map = [];
-        this.entities = [];
-        this.mapW = 40 + (this.level * 5); // Длина карты
-
-        // 1. Заполняем пустотой
-        for(let y=0; y<this.mapH; y++) {
-            this.map[y] = new Array(this.mapW).fill(0);
-        }
-
-        // 2. Генерируем ГАРАНТИРОВАННЫЙ пол
-        const groundY = 10;
-        for(let x=0; x<this.mapW; x++) {
-            // Границы уровня
-            if (x === 0 || x === this.mapW - 1) {
-                for(let y=0; y<this.mapH; y++) this.map[y][x] = 1; // Стены
-            } 
-            // Пол (с ямами, но не в начале)
-            else if (x > 10 && x < this.mapW - 10 && Math.random() < 0.1) {
-                // Яма - ничего не рисуем
-            } else {
-                this.map[groundY][x] = 1; // Пол
-                // Земля под полом
-                for(let y=groundY+1; y<this.mapH; y++) this.map[y][x] = 1;
-
-                // Враги
-                if (x > 10 && Math.random() < 0.1) {
-                    this.spawnEnemy(x*TILE, (groundY-1)*TILE);
-                }
-
-                // Платформы
-                if (Math.random() < 0.3) {
-                    let py = groundY - 3;
-                    this.map[py][x] = 1;
-                    if(Math.random() < 0.2) this.spawnEnemy(x*TILE, (py-1)*TILE);
-                }
-            }
-        }
-
-        // 3. Спавн игрока (безопасное место)
-        this.player.x = TILE * 3;
-        this.player.y = TILE * 5; // Падает сверху
-        this.player.vx = 0;
-        this.player.vy = 0;
-
-        // 4. Дверь (в конце)
-        // Ищем твердую землю в конце карты
-        let doorX = this.mapW - 3;
-        this.map[groundY][doorX] = 1; // Гарантируем пол под дверью
-        this.map[groundY][doorX-1] = 1;
-        this.door = { x: doorX*TILE, y: (groundY-1.5)*TILE, w:40, h:60 };
-    },
-
-    spawnEnemy: function(x, y) {
-        let type = (Math.random()>0.5 && this.level>1) ? 2 : 1;
-        this.entities.push({
-            x:x, y:y, w:30, h:30, 
-            type:type, hp: 20 + (this.level*5), 
-            vx:1, vy:0, dir:1
-        });
-    },
-
-    update: function() {
-        if(!this.running) return;
-        const p = this.player;
-
-        // --- ИГРОК ---
-        if(keys.l) { p.vx = -SPEED; p.dir = -1; }
-        else if(keys.r) { p.vx = SPEED; p.dir = 1; }
-        else p.vx *= 0.5;
-
-        // Прыжок
-        if(keys.u && p.grounded) { p.vy = -JUMP; p.grounded = false; }
-
-        // Физика
-        p.vy += GRAVITY;
-        p.x += p.vx;
-        this.collide(p, 'x');
-        p.y += p.vy;
-        this.collide(p, 'y');
-
-        // Смерть от падения
-        if(p.y > this.mapH * TILE + 200) this.gameOver();
-
-        // Атака
-        if(p.atkCd > 0) p.atkCd--;
-        if(keys.atk && p.atkCd === 0) {
-            p.atkCd = 20;
-            // Хитбокс удара
-            let hitX = p.dir === 1 ? p.x + p.w : p.x - 40;
-            let hitRect = { x: hitX, y: p.y, w: 40, h: p.h };
-
-            this.entities.forEach(e => {
-                if(this.rectIntersect(hitRect, e)) {
-                    e.hp -= p.dmg;
-                    e.vx = p.dir * 8; // Отброс
-                    e.vy = -5;
-                    e.grounded = false;
-                    if(e.hp <= 0) {
-                        e.dead = true;
-                        p.gold += 10;
-                    }
-                }
-            });
-        }
-
-        // --- ВРАГИ ---
-        this.entities.forEach(e => {
-            e.vy += GRAVITY;
-
-            // Простой ИИ
-            if(e.grounded) {
-                if(e.type === 1) { // Слизень (тупой)
-                   if(Math.random()<0.02) e.dir *= -1;
-                } else { // Скелет (идет к игроку)
-                    if(Math.abs(p.x - e.x) < 200) {
-                        e.dir = p.x > e.x ? 1 : -1;
-                    }
-                }
-                e.vx = e.dir * (e.type===1 ? 2 : 3);
-            }
-
-            e.x += e.vx; this.collide(e, 'x');
-            e.y += e.vy; this.collide(e, 'y');
-
-            // Урон игроку
-            if(this.rectIntersect(p, e) && !e.dead && p.iFrame <= 0) {
-                p.hp -= 20;
-                p.iFrame = 60;
-                p.vy = -8;
-                p.vx = -p.dir * 10;
-                if(p.hp <= 0) this.gameOver();
-            }
-        });
-        this.entities = this.entities.filter(e => !e.dead);
-        if(p.iFrame > 0) p.iFrame--;
-
-        // --- КАМЕРА ---
-        let targetCam = p.x - W/2;
-        // Ограничиваем камеру, чтобы не видеть пустоту
-        targetCam = Math.max(0, Math.min(targetCam, this.mapW * TILE - W));
-        this.camX += (targetCam - this.camX) * 0.1;
-
-        // --- ВЫХОД ---
-        if(this.rectIntersect(p, this.door)) {
-            this.levelComplete();
-        }
-
-        // UI
-        document.getElementById('hp-bar').style.width = (p.hp / p.maxHp * 100) + '%';
-        document.getElementById('ui-gold').innerText = p.gold;
-        document.getElementById('ui-lvl').innerText = this.level;
-    },
-
-    draw: function() {
-        // Фон (Серый чтобы видеть границы, если что-то пойдет не так)
-        ctx.fillStyle = '#212121'; 
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.save();
-        ctx.translate(-Math.floor(this.camX), 0);
-
-        // Рисуем карту (только видимую часть)
-        let startCol = Math.floor(this.camX / TILE);
-        let endCol = startCol + (W / TILE) + 2;
-
-        for(let y=0; y<this.mapH; y++) {
-            for(let x=startCol; x<endCol; x++) {
-                if(this.map[y] && this.map[y][x]) {
-                    Art.wall(x*TILE, y*TILE);
-                }
-            }
-        }
-
-        // Дверь
-        Art.door(this.door.x, this.door.y);
-
-        // Враги
-        this.entities.forEach(e => Art.enemy(e.x, e.y, e.type, e.dir));
-
-        // Игрок (мигание если ранен)
-        if(Math.floor(this.player.iFrame / 5) % 2 === 0) {
-            Art.player(this.player.x, this.player.y, this.player.dir, this.player.atkCd > 10);
-        }
-
-        ctx.restore();
-    },
-
-    collide: function(obj, axis) {
-        let x1 = Math.floor(obj.x / TILE);
-        let x2 = Math.floor((obj.x + obj.w - 0.1) / TILE);
-        let y1 = Math.floor(obj.y / TILE);
-        let y2 = Math.floor((obj.y + obj.h - 0.1) / TILE);
-
-        if (x1 < 0 || x2 >= this.mapW || y1 < 0 || y2 >= this.mapH) return;
-
-        for(let y=y1; y<=y2; y++) {
-            for(let x=x1; x<=x2; x++) {
-                if(this.map[y] && this.map[y][x] === 1) {
-                    if(axis === 'x') {
-                        if(obj.vx > 0) obj.x = x*TILE - obj.w;
-                        else obj.x = (x+1)*TILE;
-                        obj.vx = 0;
-                    } else {
-                        if(obj.vy > 0) {
-                            obj.y = y*TILE - obj.h;
-                            obj.grounded = true;
-                        } else {
-                            obj.y = (y+1)*TILE;
-                        }
-                        obj.vy = 0;
-                    }
-                    return;
-                }
-            }
-        }
-        if(axis === 'y') obj.grounded = false;
-    },
-
-    rectIntersect: function(r1, r2) {
-        return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
-    },
-
-    levelComplete: function() {
-        this.running = false;
-        document.getElementById('rest-menu').style.display = 'flex';
-        document.getElementById('rest-gold').innerText = this.player.gold;
-    },
-
-    gameOver: function() {
-        this.running = false;
-        document.getElementById('death-menu').style.display = 'flex';
-    },
-
-    loop: function() {
-        if(Game.running) {
-            Game.update();
-            Game.draw();
-            requestAnimationFrame(Game.loop);
-        }
-    },
-
-    // Магазин
-    buyHeal: function() {
-        if(this.player.gold >= 50) {
-            this.player.gold -= 50;
-            this.player.hp = Math.min(this.player.hp + 50, this.player.maxHp);
-            document.getElementById('rest-gold').innerText = this.player.gold;
-        }
-    },
-    buyDmg: function() {
-        if(this.player.gold >= 100) {
-            this.player.gold -= 100;
-            this.player.dmg += 5;
-            document.getElementById('rest-gold').innerText = this.player.gold;
-        }
-    }
-};
-
-// --- СОБЫТИЯ ---
-window.addEventListener('resize', Game.resize);
-
-// Клавиатура
-window.onkeydown = e => {
-    if(e.code==='ArrowLeft'||e.code==='KeyA') keys.l=true;
-    if(e.code==='ArrowRight'||e.code==='KeyD') keys.r=true;
-    if(e.code==='ArrowUp'||e.code==='Space') keys.u=true;
-    if(e.code==='KeyZ') keys.atk=true;
-};
-window.onkeyup = e => {
-    if(e.code==='ArrowLeft'||e.code==='KeyA') keys.l=false;
-    if(e.code==='ArrowRight'||e.code==='KeyD') keys.r=false;
-    if(e.code==='ArrowUp'||e.code==='Space') keys.u=false;
-    if(e.code==='KeyZ') keys.atk=false;
-};
-
-// Тач (Мобильный)
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-    document.getElementById('mobile-controls').style.display = 'flex';
-    const bindTouch = (id, key) => {
-        let el = document.getElementById(id);
-        el.addEventListener('touchstart', (e)=>{ e.preventDefault(); keys[key]=true; });
-        el.addEventListener('touchend', (e)=>{ e.preventDefault(); keys[key]=false; });
+    // Настройки игры
+    const CONFIG = {
+        ringCount: 16,        // Количество колец
+        ringGap: 25,          // Расстояние между кольцами
+        startRadius: 50,      // Радиус первого кольца
+        ballRadius: 8,        // Размер мяча
+        rotationSpeed: 0.015, // Скорость вращения колец
+        gravity: 0.15,        // Сила гравитации
+        bounce: 0.9,          // Упругость (1 = вечный прыжок, 0.9 = теряет энергию)
+        gapSize: Math.PI / 4, // Размер дырки в кольце (в радианах)
+        timeLimit: 100        // Секунды
     };
-    bindTouch('btn-l', 'l'); bindTouch('btn-r', 'r');
-    bindTouch('btn-j', 'u'); bindTouch('btn-atk', 'atk');
-}
+
+    let width, height, centerX, centerY;
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        // Делаем квадратный канвас, чтобы круги были ровными
+        const size = Math.min(width, height) * 0.95;
+        canvas.width = size;
+        canvas.height = size;
+        centerX = size / 2;
+        centerY = size / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Ball {
+        constructor() {
+            this.reset();
+        }
+
+        reset() {
+            this.x = 0;
+            this.y = 0;
+            this.vx = 2; // Начальный толчок
+            this.vy = 0;
+            this.escaped = false;
+        }
+
+        update() {
+            if (this.escaped) return;
+
+            // Гравитация
+            this.vy += CONFIG.gravity;
+
+            // Движение
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // Расстояние от центра
+            this.dist = Math.sqrt(this.x * this.x + this.y * this.y);
+
+            // Угол мяча (-PI до PI)
+            this.angle = Math.atan2(this.y, this.x); 
+            // Нормализуем угол к 0...2PI для удобства
+            if (this.angle < 0) this.angle += Math.PI * 2;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, CONFIG.ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#00ffff'; // Голубой неон (Cyan)
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ffff';
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    class Ring {
+        constructor(index) {
+            this.index = index;
+            this.radius = CONFIG.startRadius + (index * CONFIG.ringGap);
+            this.active = true;
+
+            // Смещение отверстия для спирального эффекта
+            this.angleOffset = index * 0.5; 
+
+            // Цвет (Градиент от белого к красному)
+            const hue = 0; // Красный
+            const light = 100 - (index * (50 / CONFIG.ringCount)); // От 100% до 50% яркости
+            this.color = `hsl(${hue}, 100%, ${light}%)`;
+        }
+
+        update() {
+            // Вращение кольца
+            this.angleOffset += CONFIG.rotationSpeed;
+            // Нормализация угла
+            if (this.angleOffset > Math.PI * 2) this.angleOffset -= Math.PI * 2;
+        }
+
+        checkCollision(ball) {
+            if (!this.active) return;
+
+            // Проверяем, касается ли мяч этого кольца
+            // Мы проверяем "внутреннюю" границу кольца для отскока
+            const distToRing = this.radius - ball.dist;
+
+            // Если мяч пересек линию кольца (с учетом его радиуса)
+            if (distToRing < CONFIG.ballRadius && distToRing > -CONFIG.ballRadius * 2) {
+
+                // Проверяем, попал ли он в дырку
+                // Вычисляем угол дырки
+                let gapStart = this.angleOffset;
+                let gapEnd = this.angleOffset + CONFIG.gapSize;
+
+                // Нормализуем углы мяча и дырки для корректного сравнения
+                let ballA = ball.angle;
+
+                // Проверка попадания в интервал угла (с учетом перехода через 0/360)
+                let inGap = false;
+
+                // Сложная логика нормализации углов, чтобы понять, внутри ли мы сектора
+                const checkAngle = (a, start, end) => {
+                    // Приводим все к 0..2PI
+                    start = start % (Math.PI*2);
+                    end = end % (Math.PI*2);
+                    if (start < 0) start += Math.PI*2;
+                    if (end < 0) end += Math.PI*2;
+
+                    if (start < end) {
+                        return a >= start && a <= end;
+                    } else {
+                        // Переход через ноль
+                        return a >= start || a <= end;
+                    }
+                };
+
+                inGap = checkAngle(ballA, gapStart, gapEnd);
+
+                if (inGap) {
+                    // ПРОШЕЛ СКВОЗЬ!
+                    // Отключаем кольцо, только если мяч полностью вышел за его радиус
+                    if (ball.dist > this.radius + CONFIG.ballRadius) {
+                        this.active = false;
+                        // Звук прохождения (опционально)
+                    }
+                } else {
+                    // ОТСКОК (БЬЕТСЯ ОБ СТЕНУ)
+                    // Вектор нормали (от центра к мячу)
+                    const nx = ball.x / ball.dist;
+                    const ny = ball.y / ball.dist;
+
+                    // Отражаем вектор скорости
+                    // V_new = V - 2(V . N)N
+                    const dot = ball.vx * nx + ball.vy * ny;
+
+                    // Только если летит "наружу"
+                    if (dot > 0) {
+                        ball.vx = (ball.vx - 2 * dot * nx) * CONFIG.bounce;
+                        ball.vy = (ball.vy - 2 * dot * ny) * CONFIG.bounce;
+
+                        // Выталкиваем мяч чуть внутрь, чтобы не застрял
+                        const overlap = CONFIG.ballRadius - distToRing;
+                        ball.x -= nx * overlap; 
+                        ball.y -= ny * overlap;
+                    }
+                }
+            } else if (ball.dist > this.radius + CONFIG.ballRadius) {
+                // Если мы как-то оказались снаружи (например, пролетели), выключаем кольцо
+                this.active = false;
+            }
+        }
+
+        draw() {
+            if (!this.active) return;
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(this.angleOffset);
+
+            ctx.beginPath();
+            // Рисуем дугу (кольцо минус дырка)
+            // Полный круг это 0 до 2PI. Дырка от 0 до gapSize. Значит рисуем от gapSize до 2PI
+            ctx.arc(0, 0, this.radius, CONFIG.gapSize, Math.PI * 2);
+
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            // Эффект свечения
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    const Game = {
+        rings: [],
+        ball: null,
+        startTime: 0,
+        running: false,
+        loopId: null,
+
+        init() {
+            this.ball = new Ball();
+            this.createRings();
+            this.startTime = Date.now();
+            this.running = true;
+            document.getElementById('restart-btn').style.display = 'none';
+            this.loop();
+        },
+
+        createRings() {
+            this.rings = [];
+            for (let i = 0; i < CONFIG.ringCount; i++) {
+                this.rings.push(new Ring(i));
+            }
+        },
+
+        restart() {
+            cancelAnimationFrame(this.loopId);
+            this.init();
+        },
+
+        checkWin() {
+            // Если все кольца неактивны
+            const activeRings = this.rings.filter(r => r.active);
+            if (activeRings.length === 0) {
+                this.running = false;
+                document.getElementById('status').innerText = "ПОБЕДА! Мяч свободен.";
+                document.getElementById('status').style.color = "#0f0";
+                document.getElementById('restart-btn').style.display = 'block';
+                return true;
+            }
+            return false;
+        },
+
+        updateTimer() {
+            if (!this.running) return;
+            const elapsed = (Date.now() - this.startTime) / 1000;
+            const remaining = Math.max(0, CONFIG.timeLimit - elapsed);
+
+            document.getElementById('timer').innerText = remaining.toFixed(2);
+
+            if (remaining <= 0) {
+                this.running = false;
+                document.getElementById('status').innerText = "ВРЕМЯ ВЫШЛО";
+                document.getElementById('status').style.color = "red";
+                document.getElementById('restart-btn').style.display = 'block';
+            }
+        },
+
+        loop() {
+            // Очистка
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (Game.running) {
+                Game.ball.update();
+                Game.rings.forEach(ring => {
+                    ring.update();
+                    ring.checkCollision(Game.ball);
+                });
+                Game.updateTimer();
+                Game.checkWin();
+
+                // Проверка вылета за пределы экрана (на всякий случай)
+                if (Game.ball.dist > Math.max(width, height)) {
+                   // Авто-победа если улетел далеко
+                   Game.rings.forEach(r => r.active = false); 
+                }
+            }
+
+            // Отрисовка (сначала внешние кольца для красоты наложения, или внутренние?)
+            // Рисуем кольца
+            Game.rings.forEach(ring => ring.draw());
+
+            // Рисуем мяч
+            Game.ball.draw();
+
+            Game.loopId = requestAnimationFrame(Game.loop);
+        }
+    };
+
+    // Запуск
+    Game.init();
 
 </script>
 </body>
