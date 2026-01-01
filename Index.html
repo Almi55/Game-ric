@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Escape: Custom Physics</title>
+    <title>Neon Rings: Ultimate Edition</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -22,547 +22,497 @@
             height: 100vh;
         }
 
-        /* --- UI ИНТЕРФЕЙС --- */
+        /* --- ИНТЕРФЕЙС --- */
         #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 10;
         }
 
-        /* ПАНЕЛЬ НАСТРОЕК */
         #settings-panel {
-            background: rgba(10, 10, 15, 0.95);
+            background: rgba(20, 20, 25, 0.95);
             border: 2px solid #00ffff;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
             padding: 20px;
-            border-radius: 10px;
+            border-radius: 12px;
             pointer-events: auto;
-            width: 300px;
-            max-height: 80vh;
+            width: 320px;
+            max-height: 85vh;
             overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            display: flex; flex-direction: column; gap: 12px;
         }
 
-        h2 {
-            margin: 0 0 10px 0;
-            color: #00ffff;
-            text-align: center;
-            text-shadow: 0 0 5px #00ffff;
-            font-size: 18px;
-        }
+        /* Скроллбар для красоты */
+        #settings-panel::-webkit-scrollbar { width: 6px; }
+        #settings-panel::-webkit-scrollbar-thumb { background: #00ffff; border-radius: 3px; }
 
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
+        h2 { margin: 0 0 5px 0; color: #00ffff; text-align: center; text-shadow: 0 0 5px #00ffff; font-size: 16px; }
 
-        label {
-            font-size: 12px;
-            color: #aaa;
-            display: flex;
-            justify-content: space-between;
-        }
+        .control-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 11px; color: #ccc; display: flex; justify-content: space-between; }
+        .val { color: #fff; font-weight: bold; }
 
-        .val-display { color: #fff; font-weight: bold; }
+        input[type=range] { width: 100%; accent-color: #00ffff; cursor: pointer; height: 5px; }
 
-        input[type=range] {
-            width: 100%;
-            accent-color: #00ffff;
-            cursor: pointer;
-        }
-
-        /* КНОПКИ */
         .btn {
-            background: linear-gradient(45deg, #00ffff, #0088ff);
-            border: none;
-            padding: 12px;
-            color: #000;
-            font-weight: bold;
-            font-family: inherit;
-            cursor: pointer;
+            background: linear-gradient(90deg, #00ffff, #0088ff);
+            border: none; padding: 12px; color: #000;
+            font-weight: bold; font-family: inherit; cursor: pointer;
+            border-radius: 4px; text-transform: uppercase; letter-spacing: 1px;
             margin-top: 10px;
-            border-radius: 5px;
-            transition: transform 0.1s, box-shadow 0.1s;
         }
-        .btn:active { transform: scale(0.95); }
-        .btn:hover { box-shadow: 0 0 15px #00ffff; }
-        .btn-red { background: linear-gradient(45deg, #ff4444, #cc0000); color: white; }
-
-        /* HUD В ИГРЕ */
-        #game-hud {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-            display: none;
-        }
+        .btn:active { transform: scale(0.98); }
+        .btn-red { background: linear-gradient(90deg, #ff4444, #cc0000); color: white; }
 
         #btn-menu {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 40px;
-            height: 40px;
+            position: absolute; top: 15px; right: 15px;
+            width: 40px; height: 40px;
             background: rgba(255,255,255,0.1);
-            border: 1px solid #fff;
-            color: #fff;
-            border-radius: 5px;
-            cursor: pointer;
-            pointer-events: auto;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff; border-radius: 50%;
+            cursor: pointer; pointer-events: auto;
+            display: none; align-items: center; justify-content: center;
+            font-size: 20px; z-index: 5;
         }
 
+        #hud {
+            position: absolute; top: 20px; width: 100%;
+            text-align: center; pointer-events: none;
+            text-shadow: 0 0 5px #000;
+        }
     </style>
 </head>
 <body>
 
-    <div id="game-hud">
-        <div style="font-size: 24px; color: #00ffff;">ОСТАЛОСЬ КОЛЕЦ: <span id="rings-left">0</span></div>
+    <div id="hud">
+        <div style="font-size: 18px; color: #aaa;">ОСТАЛОСЬ</div>
+        <div style="font-size: 32px; color: #00ffff; font-weight: bold;" id="rings-left">0</div>
     </div>
 
     <button id="btn-menu" onclick="Game.pause()">⚙️</button>
 
     <div id="ui-layer">
         <div id="settings-panel">
-            <h2>НАСТРОЙКИ СИМУЛЯЦИИ</h2>
+            <h2>ПАРАМЕТРЫ СИМУЛЯЦИИ</h2>
 
             <div class="control-group">
-                <label>Количество колец: <span id="val-count">15</span></label>
-                <input type="range" id="inp-count" min="3" max="50" value="15" oninput="UI.updateVal('count', this.value)">
+                <label>Количество колец: <span id="v-count" class="val">12</span></label>
+                <input type="range" id="i-count" min="3" max="40" value="12" oninput="UI.upd('count', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Расстояние (Gap): <span id="val-gap">25</span></label>
-                <input type="range" id="inp-gap" min="10" max="60" value="25" oninput="UI.updateVal('gap', this.value)">
+                <label>Расстояние (Gap): <span id="v-gap" class="val">30</span></label>
+                <input type="range" id="i-gap" min="15" max="80" value="30" oninput="UI.upd('gap', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Скорость вращения: <span id="val-rot">0.02</span></label>
-                <input type="range" id="inp-rot" min="0" max="0.1" step="0.001" value="0.02" oninput="UI.updateVal('rot', this.value)">
+                <label>Толщина линий: <span id="v-thick" class="val">4</span></label>
+                <input type="range" id="i-thick" min="1" max="15" value="4" oninput="UI.upd('thick', this.value)">
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #333; width: 100%; margin: 5px 0;">
+
+            <div class="control-group">
+                <label>Базовая скорость: <span id="v-rot" class="val">0.015</span></label>
+                <input type="range" id="i-rot" min="0" max="0.1" step="0.001" value="0.015" oninput="UI.upd('rot', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Размер дырки (град): <span id="val-hole">45</span></label>
-                <input type="range" id="inp-hole" min="10" max="120" value="45" oninput="UI.updateVal('hole', this.value)">
+                <label>Разброс скоростей: <span id="v-step" class="val">0.002</span></label>
+                <input type="range" id="i-step" min="0" max="0.02" step="0.0005" value="0.002" oninput="UI.upd('step', this.value)">
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #333; width: 100%; margin: 5px 0;">
+
+            <div class="control-group">
+                <label>Размер дырки (°): <span id="v-hole" class="val">50</span></label>
+                <input type="range" id="i-hole" min="20" max="120" value="50" oninput="UI.upd('hole', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Скорость мяча: <span id="val-speed">4</span></label>
-                <input type="range" id="inp-speed" min="1" max="15" step="0.5" value="4" oninput="UI.updateVal('speed', this.value)">
+                <label>Скорость мяча: <span id="v-speed" class="val">5</span></label>
+                <input type="range" id="i-speed" min="2" max="20" step="0.5" value="5" oninput="UI.upd('speed', this.value)">
             </div>
 
             <div class="control-group">
-                <label>Размер мяча: <span id="val-size">8</span></label>
-                <input type="range" id="inp-size" min="2" max="20" value="8" oninput="UI.updateVal('size', this.value)">
+                <label>Размер мяча: <span id="v-size" class="val">8</span></label>
+                <input type="range" id="i-size" min="3" max="20" value="8" oninput="UI.upd('size', this.value)">
             </div>
 
             <button class="btn" onclick="Game.start()">ЗАПУСТИТЬ</button>
-            <button class="btn btn-red" id="btn-restart-panel" onclick="Game.restart()" style="display:none">РЕСТАРТ</button>
+            <button class="btn btn-red" id="btn-restart" onclick="Game.restart()" style="display:none">РЕСТАРТ</button>
         </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
 <script>
-    // --- ЗВУКОВОЙ ДВИЖОК (Web Audio API) ---
-    const AudioEngine = {
+    // --- АУДИО (Простые синтезированные звуки) ---
+    const AudioSys = {
         ctx: null,
-        init() {
-            if (!this.ctx) {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            }
+        init() { 
+            if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); 
         },
-        playTone(freq, type, duration) {
-            if (!this.ctx) return;
+        play(freq, type, vol, decay) {
+            if(!this.ctx) return;
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             osc.type = type;
             osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start();
-            osc.stop(this.ctx.currentTime + duration);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + decay);
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(); osc.stop(this.ctx.currentTime + decay);
         },
-        bounce() { this.playTone(200, 'square', 0.1); },
-        escape() { this.playTone(600, 'sine', 0.2); },
-        win() { 
-            this.playTone(400, 'triangle', 0.1); 
-            setTimeout(() => this.playTone(600, 'triangle', 0.1), 100);
-            setTimeout(() => this.playTone(800, 'triangle', 0.4), 200);
-        }
+        hit() { this.play(150, 'square', 0.05, 0.1); },
+        pop() { this.play(600 + Math.random()*200, 'sine', 0.1, 0.2); },
+        win() { this.play(440, 'triangle', 0.2, 0.5); setTimeout(()=>this.play(880, 'triangle', 0.2, 0.5), 150); }
     };
 
-    // --- НАСТРОЙКИ ---
-    const PARAMS = {
-        ringCount: 15,
-        ringGap: 25,
-        rotationSpeed: 0.02,
-        holeSizeDeg: 45,
-        ballSpeed: 4,
-        ballRadius: 8
+    // --- ПАРАМЕТРЫ ---
+    const CFG = {
+        count: 12,
+        gap: 30,
+        thick: 4,
+        rotBase: 0.015,
+        rotStep: 0.002, // Разница скоростей
+        holeDeg: 50,
+        speed: 5,
+        ballR: 8
     };
 
     // --- КЛАССЫ ---
-
-    class Particle {
-        constructor(x, y, color) {
-            this.x = x; this.y = y;
-            this.vx = (Math.random() - 0.5) * 5;
-            this.vy = (Math.random() - 0.5) * 5;
-            this.life = 1.0;
-            this.color = color;
-        }
-        update() {
-            this.x += this.vx;
-            this.y += this.vy;
-            this.life -= 0.03;
-        }
-        draw(ctx) {
-            ctx.globalAlpha = this.life;
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 2, 0, Math.PI*2);
-            ctx.fill();
-            ctx.globalAlpha = 1.0;
-        }
-    }
-
     class Ball {
         constructor() {
-            this.reset();
+            this.x = 0; this.y = 0;
+            this.vx = 0; this.vy = 0;
+            this.trail = [];
         }
 
         reset() {
-            this.x = 0; 
-            this.y = 0;
-            // Случайный угол старта
-            const angle = Math.random() * Math.PI * 2;
-            this.vx = Math.cos(angle) * PARAMS.ballSpeed;
-            this.vy = Math.sin(angle) * PARAMS.ballSpeed;
-
-            this.trail = []; // Шлейф
+            this.x = 0; this.y = 0;
+            const a = Math.random() * Math.PI * 2;
+            this.vx = Math.cos(a) * CFG.speed;
+            this.vy = Math.sin(a) * CFG.speed;
+            this.trail = [];
         }
 
         update() {
-            // Сохраняем позицию для шлейфа
-            this.trail.push({x: this.x, y: this.y});
-            if (this.trail.length > 15) this.trail.shift();
+            // Сохраняем предыдущую позицию для коллизий
+            this.prevX = this.x;
+            this.prevY = this.y;
+            this.prevDist = Math.sqrt(this.x*this.x + this.y*this.y);
 
-            // Движение (без гравитации, чистая инерция)
+            // Движение
             this.x += this.vx;
             this.y += this.vy;
 
-            // Расчет данных для коллизии
-            this.dist = Math.sqrt(this.x * this.x + this.y * this.y);
+            // Текущие данные
+            this.dist = Math.sqrt(this.x*this.x + this.y*this.y);
             this.angle = Math.atan2(this.y, this.x);
             if (this.angle < 0) this.angle += Math.PI * 2;
-        }
-
-        draw(ctx, cx, cy) {
-            ctx.translate(cx, cy);
 
             // Шлейф
-            if (this.trail.length > 1) {
+            this.trail.push({x: this.x, y: this.y});
+            if(this.trail.length > 20) this.trail.shift();
+        }
+
+        draw(ctx) {
+            // Рисуем шлейф
+            if(this.trail.length > 1) {
                 ctx.beginPath();
                 ctx.moveTo(this.trail[0].x, this.trail[0].y);
-                for(let i=1; i<this.trail.length; i++) {
-                    ctx.lineTo(this.trail[i].x, this.trail[i].y);
-                }
-                ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
-                ctx.lineWidth = PARAMS.ballRadius / 2;
+                for(let p of this.trail) ctx.lineTo(p.x, p.y);
+                ctx.strokeStyle = `rgba(0, 255, 255, 0.3)`;
+                ctx.lineWidth = CFG.ballR;
+                ctx.lineCap = 'round';
                 ctx.stroke();
             }
 
             // Мяч
             ctx.beginPath();
-            ctx.arc(this.x, this.y, PARAMS.ballRadius, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, CFG.ballR, 0, Math.PI*2);
             ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00ffff';
+            ctx.shadowColor = '#0ff'; ctx.shadowBlur = 15;
             ctx.fill();
             ctx.shadowBlur = 0;
-
-            ctx.translate(-cx, -cy);
         }
 
+        // Отражение от нормали (nx, ny)
         bounce(nx, ny) {
-            // Отражение вектора: V' = V - 2(V * N)N
             const dot = this.vx * nx + this.vy * ny;
             this.vx = this.vx - 2 * dot * nx;
             this.vy = this.vy - 2 * dot * ny;
 
-            // Нормализация скорости (чтобы не ускорялся и не замедлялся от багов)
-            const currentSpeed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
-            this.vx = (this.vx / currentSpeed) * PARAMS.ballSpeed;
-            this.vy = (this.vy / currentSpeed) * PARAMS.ballSpeed;
+            // Нормализация скорости (чтобы не ускорялся)
+            const mag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+            this.vx = (this.vx / mag) * CFG.speed;
+            this.vy = (this.vy / mag) * CFG.speed;
 
-            AudioEngine.bounce();
+            AudioSys.hit();
         }
     }
 
     class Ring {
-        constructor(index) {
-            this.index = index;
+        constructor(idx) {
+            this.idx = idx;
             this.active = true;
-            this.angleOffset = Math.random() * Math.PI * 2;
-            this.rotationDir = index % 2 === 0 ? 1 : -1; // Чередуем направление
+            this.radius = 50 + (idx * CFG.gap);
 
-            // Цвет (радуга)
-            const hue = (index / PARAMS.ringCount) * 360;
-            this.color = `hsl(${hue}, 80%, 60%)`;
-        }
+            // Скорость вращения: База + (Шаг * Индекс). 
+            // Чередуем направление для красоты (четные в одну, нечетные в другую)
+            let dir = idx % 2 === 0 ? 1 : -1;
+            this.speed = (CFG.rotBase + (idx * CFG.rotStep)) * dir;
 
-        getRadius() {
-            return 50 + (this.index * PARAMS.ringGap);
+            this.angle = Math.random() * Math.PI * 2;
+
+            // Цвет
+            this.hue = (idx / CFG.count) * 360; 
         }
 
         update() {
-            this.angleOffset += PARAMS.rotationSpeed * this.rotationDir;
-            if (this.angleOffset > Math.PI*2) this.angleOffset -= Math.PI*2;
-            if (this.angleOffset < 0) this.angleOffset += Math.PI*2;
+            if(!this.active) return;
+            this.angle += this.speed;
+            // Нормализация угла 0..2PI
+            this.angle = this.angle % (Math.PI*2);
+            if(this.angle < 0) this.angle += Math.PI*2;
         }
 
-        checkCollision(ball) {
-            if (!this.active) return;
-            const radius = this.getRadius();
-            const dist = ball.dist;
-            const ballR = PARAMS.ballRadius;
+        // Проверка столкновения
+        check(ball) {
+            if(!this.active) return;
 
-            // Если мяч касается границы кольца (изнутри)
-            if (dist + ballR >= radius && dist - ballR <= radius) {
+            // Граница кольца (внутренняя стенка)
+            // Учитываем радиус мяча! Мы бьемся поверхностью мяча о поверхность кольца
+            const collisionDist = this.radius - CFG.ballR;
 
-                // Проверка дырки
-                const holeRad = (PARAMS.holeSizeDeg * Math.PI) / 180;
+            // 1. Проверяем, пересек ли мяч границу кольца в этом кадре
+            // Было: prevDist < collisionDist
+            // Стало: dist >= collisionDist
+            if (ball.prevDist < collisionDist && ball.dist >= collisionDist) {
 
-                // Нормализация углов
-                let ballA = ball.angle;
-                let startA = this.angleOffset;
-                let endA = this.angleOffset + holeRad;
+                // Мяч "ударился" или "пролетает". Проверяем угол.
+                const holeRad = (CFG.holeDeg * Math.PI) / 180;
 
-                // Функция проверки вхождения угла
-                const isAngleIn = (a, s, e) => {
-                    s = s % (Math.PI*2); e = e % (Math.PI*2);
-                    if (s<0) s+=Math.PI*2; if(e<0) e+=Math.PI*2;
-                    if (s < e) return a >= s && a <= e;
-                    return a >= s || a <= e;
-                };
+                // Углы дырки
+                let startA = this.angle;
+                let endA = this.angle + holeRad;
 
-                if (isAngleIn(ballA, startA, endA)) {
-                    // ПРОХОД (ESCAPE)
-                    // Ждем пока мяч полностью выйдет за пределы радиуса кольца
-                    if (dist - ballR > radius) {
-                        this.active = false;
-                        AudioEngine.escape();
-                        Game.spawnParticles(ball.x, ball.y, this.color);
-                    }
+                // Нормализуем углы для сравнения
+                const normalize = (a) => {
+                    a = a % (Math.PI*2);
+                    if(a < 0) a += Math.PI*2;
+                    return a;
+                }
+
+                let bA = ball.angle; // Угол мяча
+                startA = normalize(startA);
+                endA = normalize(endA);
+
+                let inGap = false;
+                if(startA < endA) {
+                    inGap = (bA >= startA && bA <= endA);
                 } else {
-                    // ОТСКОК
-                    // Только если мяч летит "наружу" (от центра)
-                    // Вектор нормали стены (смотрит ВНУТРЬ круга)
-                    const nx = -ball.x / dist;
-                    const ny = -ball.y / dist;
+                    // Дырка пересекает 0 (например 350° ... 10°)
+                    inGap = (bA >= startA || bA <= endA);
+                }
 
-                    // Скалярное произведение скорости и нормали. 
-                    // Если < 0, значит они смотрят в разные стороны (мяч летит в стену)
-                    const dot = ball.vx * nx + ball.vy * ny;
+                if (inGap) {
+                    // === ПОПАЛ В ДЫРКУ (ЛОПАЕМ) ===
+                    this.active = false;
+                    AudioSys.pop();
+                    Game.explode(this.radius, this.hue);
+                    // Мяч летит дальше, ничего не делаем с его скоростью
+                } else {
+                    // === УДАР ОБ СТЕНУ ===
+                    // Вектор нормали (от центра к мячу, но инвертированный, т.к. бьем изнутри)
+                    // Нормаль поверхности смотрит В ЦЕНТР круга
+                    let nx = -ball.x / ball.dist;
+                    let ny = -ball.y / ball.dist;
 
-                    if (dot < 0) {
-                        ball.bounce(nx, ny);
-                        // Выталкиваем мяч чуть внутрь, чтобы не застрял
-                        const overlap = (radius - ballR) - dist; // Должен быть внутри radius-ballR
-                        // Коррекция позиции
-                        const pushX = ball.x / dist; // вектор от центра
-                        const pushY = ball.y / dist;
-                        ball.x = pushX * (radius - ballR - 1);
-                        ball.y = pushY * (radius - ballR - 1);
-                    }
+                    ball.bounce(nx, ny);
+
+                    // Коррекция позиции (чтобы не застрял)
+                    // Возвращаем его чуть-чуть назад внутрь круга
+                    let pushRatio = (collisionDist - 1) / ball.dist; 
+                    ball.x *= pushRatio;
+                    ball.y *= pushRatio;
                 }
             }
         }
 
-        draw(ctx, cx, cy) {
-            if (!this.active) return;
-            const r = this.getRadius();
-            const holeRad = (PARAMS.holeSizeDeg * Math.PI) / 180;
-
-            ctx.translate(cx, cy);
-            ctx.rotate(this.angleOffset);
+        draw(ctx) {
+            if(!this.active) return;
+            const holeRad = (CFG.holeDeg * Math.PI) / 180;
 
             ctx.beginPath();
-            // Рисуем дугу (оставшуюся часть кольца)
-            // Полный круг 2PI. Дырка от 0 до holeRad. Рисуем от holeRad до 2PI.
-            ctx.arc(0, 0, r, holeRad, Math.PI * 2);
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.shadowColor = this.color;
+            // Рисуем дугу (Весь круг КРОМЕ дырки)
+            // start = angle + hole, end = angle
+            ctx.arc(0, 0, this.radius, this.angle + holeRad, this.angle);
+
+            ctx.strokeStyle = `hsl(${this.hue}, 80%, 60%)`;
+            ctx.lineWidth = CFG.thick;
+            ctx.lineCap = 'round'; // Скругленные концы линий
+            ctx.shadowColor = ctx.strokeStyle;
             ctx.shadowBlur = 10;
             ctx.stroke();
             ctx.shadowBlur = 0;
-
-            ctx.rotate(-this.angleOffset);
-            ctx.translate(-cx, -cy);
         }
     }
 
-    // --- ДВИЖОК ИГРЫ ---
+    // --- СИСТЕМА ЧАСТИЦ ---
+    let particles = [];
+    function updateParticles() {
+        for(let i=particles.length-1; i>=0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            p.life -= 0.02;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+    }
+    function drawParticles(ctx) {
+        for(let p of particles) {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2 + Math.random()*2, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // --- ИГРОВОЙ ЦИКЛ ---
     const Game = {
         canvas: document.getElementById('gameCanvas'),
         ctx: document.getElementById('gameCanvas').getContext('2d'),
-        width: 0, height: 0, cx: 0, cy: 0,
-
-        rings: [],
-        ball: null,
-        particles: [],
+        w: 0, h: 0,
         running: false,
+        ball: new Ball(),
+        rings: [],
 
         init() {
             this.resize();
             window.addEventListener('resize', () => this.resize());
-            this.ball = new Ball();
-            this.loop = this.loop.bind(this);
-            requestAnimationFrame(this.loop);
+            requestAnimationFrame(() => this.loop());
         },
 
         resize() {
-            this.width = window.innerWidth;
-            this.height = window.innerHeight;
-            this.canvas.width = this.width;
-            this.canvas.height = this.height;
-            this.cx = this.width / 2;
-            this.cy = this.height / 2;
-        },
-
-        createRings() {
-            this.rings = [];
-            for(let i=0; i<PARAMS.ringCount; i++) {
-                this.rings.push(new Ring(i));
-            }
+            this.w = window.innerWidth;
+            this.h = window.innerHeight;
+            this.canvas.width = this.w;
+            this.canvas.height = this.h;
         },
 
         start() {
-            AudioEngine.init();
-            this.createRings();
+            AudioSys.init();
+
+            // Генерация колец
+            this.rings = [];
+            for(let i=0; i<CFG.count; i++) {
+                this.rings.push(new Ring(i));
+            }
+
             this.ball.reset();
-            this.particles = [];
+            particles = [];
 
-            // Скрыть меню
-            document.getElementById('settings-panel').style.display = 'none';
             document.getElementById('ui-layer').style.display = 'none';
-            document.getElementById('game-hud').style.display = 'block';
+            document.getElementById('btn-restart').style.display = 'block'; // Показать кнопку рестарт
             document.getElementById('btn-menu').style.display = 'flex';
-            document.getElementById('btn-restart-panel').style.display = 'block'; // Показать кнопку рестарт в меню
-
             this.running = true;
         },
 
         pause() {
             this.running = false;
             document.getElementById('ui-layer').style.display = 'flex';
-            document.getElementById('settings-panel').style.display = 'flex';
         },
 
         restart() {
             this.start();
         },
 
-        spawnParticles(x, y, color) {
-            for(let i=0; i<20; i++) {
-                this.particles.push(new Particle(x, y, color));
+        explode(rad, hue) {
+            // Создаем взрыв по кругу
+            for(let i=0; i<30; i++) {
+                let a = (Math.PI*2 / 30) * i;
+                particles.push({
+                    x: Math.cos(a)*rad, 
+                    y: Math.sin(a)*rad,
+                    vx: Math.cos(a)*(2+Math.random()*3),
+                    vy: Math.sin(a)*(2+Math.random()*3),
+                    life: 1.0,
+                    color: `hsl(${hue}, 100%, 70%)`
+                });
             }
-        },
-
-        update() {
-            if (!this.running) return;
-
-            this.ball.update();
-
-            let activeCount = 0;
-            this.rings.forEach(r => {
-                r.update();
-                r.checkCollision(this.ball);
-                if (r.active) activeCount++;
-            });
-
-            document.getElementById('rings-left').innerText = activeCount;
-
-            if (activeCount === 0 && this.running) {
-                // Победа
-                AudioEngine.win();
-                // Можно добавить логику победы, но мяч просто улетит в бесконечность
-            }
-
-            // Проверка, если мяч улетел далеко
-            if (this.ball.dist > Math.max(this.width, this.height)) {
-                // Мяч свободен
-            }
-
-            // Частицы
-            this.particles.forEach(p => p.update());
-            this.particles = this.particles.filter(p => p.life > 0);
-        },
-
-        draw() {
-            // Очистка с легким шлейфом для красоты (опционально, сейчас просто очистка)
-            this.ctx.fillStyle = '#050505';
-            this.ctx.fillRect(0, 0, this.width, this.height);
-
-            // Рисуем кольца
-            // Рисуем в обратном порядке (внешние сначала), чтобы внутренние были поверх
-            for (let i = this.rings.length - 1; i >= 0; i--) {
-                this.rings[i].draw(this.ctx, this.cx, this.cy);
-            }
-
-            // Рисуем мяч
-            this.ball.draw(this.ctx, this.cx, this.cy);
-
-            // Рисуем частицы
-            this.ctx.translate(this.cx, this.cy);
-            this.particles.forEach(p => p.draw(this.ctx));
-            this.ctx.translate(-this.cx, -this.cy);
         },
 
         loop() {
-            this.update();
-            this.draw();
-            requestAnimationFrame(this.loop);
+            // Очистка
+            this.ctx.fillStyle = '#050505';
+            this.ctx.fillRect(0,0,this.w,this.h);
+
+            const cx = this.w/2;
+            const cy = this.h/2;
+
+            if(this.running) {
+                this.ball.update();
+
+                let activeCount = 0;
+                // Проверяем коллизии (от внутренних к внешним)
+                for(let r of this.rings) {
+                    if(r.active) {
+                        r.update();
+                        r.check(this.ball);
+                        activeCount++;
+                    }
+                }
+                document.getElementById('rings-left').innerText = activeCount;
+
+                // Проверка вылета
+                if(this.ball.dist > Math.max(this.w, this.h)) {
+                   // Победа/Конец
+                }
+
+                updateParticles();
+            }
+
+            // Рендер
+            this.ctx.translate(cx, cy);
+
+            // Кольца (рисуем с внешних к внутренним для глубины, или наоборот)
+            for(let i=this.rings.length-1; i>=0; i--) {
+                this.rings[i].draw(this.ctx);
+            }
+
+            drawParticles(this.ctx);
+            this.ball.draw(this.ctx);
+
+            this.ctx.translate(-cx, -cy);
+
+            requestAnimationFrame(() => this.loop());
         }
     };
 
-    // --- UI ЛОГИКА ---
+    // --- UI ОБРАБОТКА ---
     const UI = {
-        updateVal(id, val) {
-            document.getElementById('val-' + id).innerText = val;
-
-            // Обновляем параметры сразу
-            if (id === 'count') PARAMS.ringCount = parseInt(val);
-            if (id === 'gap') PARAMS.ringGap = parseInt(val);
-            if (id === 'rot') PARAMS.rotationSpeed = parseFloat(val);
-            if (id === 'hole') PARAMS.holeSizeDeg = parseInt(val);
-            if (id === 'speed') PARAMS.ballSpeed = parseFloat(val);
-            if (id === 'size') PARAMS.ballRadius = parseInt(val);
+        upd(id, val) {
+            document.getElementById('v-'+id).innerText = val;
+            val = Number(val);
+            if(id === 'count') CFG.count = val;
+            if(id === 'gap') CFG.gap = val;
+            if(id === 'thick') CFG.thick = val;
+            if(id === 'rot') CFG.rotBase = val;
+            if(id === 'step') CFG.rotStep = val;
+            if(id === 'hole') CFG.holeDeg = val;
+            if(id === 'speed') CFG.speed = val;
+            if(id === 'size') CFG.ballR = val;
         }
     };
 
-    // Запуск
     Game.init();
-
 </script>
 </body>
 </html>
