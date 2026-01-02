@@ -3,34 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Merge Game 2.0</title>
+    <title>Merge Game 2.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- СТИЛИ ИНТЕРФЕЙСА --- */
-        body { margin: 0; padding: 0; overflow: hidden; background: #121212; font-family: 'Segoe UI', sans-serif; touch-action: none; color: white; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #121212; font-family: 'Segoe UI', sans-serif; touch-action: none; color: white; -webkit-tap-highlight-color: transparent; }
         #game-container { position: relative; width: 100vw; height: 100vh; }
 
         /* СЛОИ */
         .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .interactive { pointer-events: auto; }
 
-        /* HUD (Счет и Баффы) */
-        #hud { display: flex; justify-content: space-between; padding: 20px; box-sizing: border-box; z-index: 5; }
-        .score-box { font-size: 24px; font-weight: bold; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-        .next-ball { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); }
+        /* HUD (Верхняя панель) */
+        #hud {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            padding: 15px; box-sizing: border-box; z-index: 5;
+            /* Важно: сам слой пропускает клики, чтобы можно было играть */
+            pointer-events: none; 
+        }
 
-        /* Кнопка БАФФА */
+        /* Счет слева */
+        .score-box {
+            background: rgba(0,0,0,0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            pointer-events: auto; /* Чтобы кнопки меню работали, если добавить */
+        }
+        .score-val { font-size: 20px; font-weight: bold; color: #fff; }
+        .next-preview { font-size: 12px; color: #ccc; margin-top: 2px; }
+
+        /* Кнопка БАФФА (Справа сверху, круглая) */
+        #buff-container {
+            pointer-events: auto; /* Кнопка должна нажиматься */
+            display: flex; flex-direction: column; align-items: center;
+        }
+
         #buff-btn {
-            background: #444; color: #888; border: 2px solid #555;
-            padding: 10px 20px; border-radius: 20px; font-weight: bold;
-            transition: 0.3s; pointer-events: auto; display: flex; align-items: center; gap: 10px;
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background: #333;
+            border: 2px solid #555;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+            overflow: hidden;
         }
-        #buff-btn.active {
-            background: linear-gradient(45deg, #ff0055, #ffcc00);
-            color: white; border: 2px solid #fff;
-            box-shadow: 0 0 15px #ff0055; animation: pulse 1.5s infinite; cursor: pointer;
+
+        /* Анимация заполнения (прогресс) */
+        #buff-progress {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
+            background: rgba(255, 204, 0, 0.5);
+            transition: height 0.5s;
+            z-index: 1;
         }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #buff-icon { z-index: 2; position: relative; }
+
+        /* Активное состояние баффа */
+        #buff-btn.ready {
+            background: #ffcc00; border-color: #fff; color: #000;
+            box-shadow: 0 0 15px #ffcc00;
+            animation: pulse 1.5s infinite;
+        }
+        #buff-btn:active { transform: scale(0.9); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
         /* МЕНЮ */
         .menu-overlay {
@@ -49,7 +87,7 @@
         .menu-btn:active { transform: scale(0.95); }
         .btn-primary { background: #0088cc; border: none; font-weight: bold; }
 
-        /* СПИСКИ (Скины, Лидерборд) */
+        /* Списки */
         .scroll-list {
             width: 80%; max-height: 50%; overflow-y: auto;
             background: #222; border-radius: 10px; padding: 10px; margin-bottom: 20px;
@@ -59,10 +97,16 @@
             padding: 15px; border-bottom: 1px solid #333; cursor: pointer;
         }
         .list-item.selected { background: #004466; }
-        .rank { font-weight: bold; color: #ffcc00; margin-right: 10px; }
 
         /* Эффект курсора для баффа */
-        .destroy-cursor { cursor: crosshair !important; }
+        .destroy-mode { 
+            cursor: crosshair !important; 
+        }
+        /* Красная рамка когда режим уничтожения */
+        .destroy-mode #game-container {
+            border: 4px solid red;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -74,7 +118,6 @@
         <button class="menu-btn btn-primary" onclick="Game.start()">ИГРАТЬ</button>
         <button class="menu-btn" onclick="Menu.showSkins()">СКИНЫ</button>
         <button class="menu-btn" onclick="Menu.showLeaderboard()">РЕКОРДЫ</button>
-        <button class="menu-btn" onclick="Menu.showSettings()">НАСТРОЙКИ</button>
     </div>
 
     <!-- МЕНЮ СКИНОВ -->
@@ -101,32 +144,29 @@
 
     <!-- HUD ИГРЫ -->
     <div id="hud" class="layer hidden">
-        <div>
-            <div class="score-box">🏆 <span id="score-val">0</span></div>
-            <div style="font-size:12px; color:#aaa">След: <span id="next-ball-preview"></span></div>
+        <!-- СЧЕТ -->
+        <div class="score-box">
+            <div class="score-val">🏆 <span id="score-val">0</span></div>
+            <div class="next-preview">След: <span id="next-ball-preview"></span></div>
         </div>
 
-        <button id="buff-btn" onclick="Game.activateBuff()">
-            🔨 УНИЧТОЖИТЬ
-            <div style="font-size:10px; opacity:0.7">(2500 очков)</div>
-        </button>
+        <!-- МОЛОТОК (Справа) -->
+        <div id="buff-container">
+            <div id="buff-btn" onclick="Game.activateBuff()">
+                <div id="buff-progress"></div>
+                <span id="buff-icon">🔨</span>
+            </div>
+            <div style="font-size:10px; margin-top:5px; opacity:0.7">2500 pts</div>
+        </div>
     </div>
 </div>
 
 <script>
     /* ==========================================
-       КОНФИГУРАЦИЯ (Настрой под себя здесь)
+       КОНФИГУРАЦИЯ
        ========================================== */
+    const SOUNDS_CFG = { merge: null, drop: null, gameover: null };
 
-    // Сюда вставлять ссылки на звуки
-    const SOUNDS_CFG = {
-        merge: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.m3u8', // Пример звука
-        drop: null,
-        gameover: null
-    };
-
-    // Скины. type: 'emoji' или 'image'.
-    // Если image, нужно указать путь к папке (path) и названия файлов.
     const SKINS_DB = {
         'memes': {
             name: 'Мемы (Default)',
@@ -144,28 +184,26 @@
             ]
         },
         'fruits': {
-            name: 'Фрукты (Пример)',
-            type: 'emoji', // Поменяй на 'image', если добавишь картинки
-            path: 'assets/fruits/', 
+            name: 'Фрукты',
+            type: 'emoji', 
+            path: '', 
             levels: [
-                { color: '#F00', label: '🍒', file: '1.png', score: 2 },
-                { color: '#F00', label: '🍓', file: '2.png', score: 4 },
-                { color: '#800080', label: '🍇', file: '3.png', score: 8 },
-                { color: '#FFA500', label: '🍊', file: '4.png', score: 16 },
-                { color: '#FFA500', label: '🥭', file: '5.png', score: 32 },
-                { color: '#FF0000', label: '🍎', file: '6.png', score: 64 },
-                { color: '#FFFF00', label: '🍐', file: '7.png', score: 128 },
-                { color: '#FFC0CB', label: '🍑', file: '8.png', score: 256 },
-                { color: '#008000', label: '🍉', file: '9.png', score: 512 }
+                { color: '#F00', label: '🍒', score: 2 },
+                { color: '#F00', label: '🍓', score: 4 },
+                { color: '#800080', label: '🍇', score: 8 },
+                { color: '#FFA500', label: '🍊', score: 16 },
+                { color: '#FFA500', label: '🥭', score: 32 },
+                { color: '#FF0000', label: '🍎', score: 64 },
+                { color: '#FFFF00', label: '🍐', score: 128 },
+                { color: '#FFC0CB', label: '🍑', score: 256 },
+                { color: '#008000', label: '🍉', score: 512 }
             ]
         }
     };
 
     /* ==========================================
-       ДВИЖОК И ЛОГИКА
+       ДВИЖОК
        ========================================== */
-
-    // Глобальные переменные
     let currentSkin = 'memes';
     let engine, render, runner;
     let score = 0;
@@ -174,17 +212,14 @@
     let gameActive = false;
     let currentBall = null;
     let canDrop = true;
-    let nextBallIndex = 0; // Какой шар следующий
+    let nextBallIndex = 0;
 
-    // Размеры (динамические)
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const BALL_SIZES = [20, 30, 40, 50, 60, 70, 80, 90, 100]; // Радиусы для 9 уровней
-
-    // Аудио контекст
+    const BALL_SIZES = [20, 30, 40, 50, 60, 70, 80, 90, 100];
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // --- МЕНЕДЖЕР МЕНЮ ---
+    // МЕНЕДЖЕР МЕНЮ
     const Menu = {
         hideAll: () => {
             document.querySelectorAll('.menu-overlay').forEach(el => el.classList.add('hidden'));
@@ -206,7 +241,7 @@
                 div.onclick = () => {
                     currentSkin = key;
                     localStorage.setItem('selectedSkin', key);
-                    Menu.showSkins(); // Перерисовать
+                    Menu.showSkins();
                 };
                 list.appendChild(div);
             }
@@ -215,13 +250,10 @@
             Menu.hideAll();
             document.getElementById('leaderboard-menu').classList.remove('hidden');
             const list = document.getElementById('leaderboard-list');
-            // Получаем рекорды из LocalStorage (в реале тут запрос к серверу)
             let records = JSON.parse(localStorage.getItem('leaderboard')) || [];
             records.sort((a,b) => b.score - a.score);
-
             list.innerHTML = '';
             if(records.length === 0) list.innerHTML = '<div style="padding:10px;text-align:center">Нет записей</div>';
-
             records.slice(0, 10).forEach((rec, i) => {
                 const div = document.createElement('div');
                 div.className = 'list-item';
@@ -229,33 +261,22 @@
                 list.appendChild(div);
             });
         },
-        showSettings: () => {
-            alert('Здесь можно добавить громкость звука и вибрацию.');
-        },
         showGameOver: () => {
             gameActive = false;
             document.getElementById('final-score').innerText = score;
             document.getElementById('game-over-menu').classList.remove('hidden');
-
-            // Сохраняем рекорд
             let records = JSON.parse(localStorage.getItem('leaderboard')) || [];
-            // Тут можно интегрировать Telegram Username
             let name = "Игрок"; 
-            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe.user) {
-                name = window.Telegram.WebApp.initDataUnsafe.user.first_name;
-            }
             records.push({name: name, score: score, date: new Date()});
             localStorage.setItem('leaderboard', JSON.stringify(records));
         }
     };
 
-    // --- ЛОГИКА ИГРЫ ---
+    // ИГРОВАЯ ЛОГИКА
     const Game = {
         start: () => {
             Menu.hideAll();
             document.getElementById('hud').classList.remove('hidden');
-
-            // Загрузка скина
             const savedSkin = localStorage.getItem('selectedSkin');
             if(savedSkin && SKINS_DB[savedSkin]) currentSkin = savedSkin;
 
@@ -268,73 +289,51 @@
         },
 
         initPhysics: () => {
-            if(engine) { // Очистка если рестарт
+            if(engine) {
                 Matter.World.clear(engine.world);
                 Matter.Engine.clear(engine);
-                if(render) {
-                    render.canvas.remove();
-                    render.canvas = null;
-                    render.context = null;
-                    render.textures = {};
-                }
+                if(render) { render.canvas.remove(); render.canvas = null; render.context = null; }
                 if(runner) Matter.Runner.stop(runner);
             }
 
-            const Engine = Matter.Engine,
-                  Render = Matter.Render,
-                  Runner = Matter.Runner,
-                  Bodies = Matter.Bodies,
-                  World = Matter.World,
-                  Events = Matter.Events;
-
-            engine = Engine.create();
-
-            // Рендер
-            render = Render.create({
+            engine = Matter.Engine.create();
+            render = Matter.Render.create({
                 element: document.getElementById('game-container'),
                 engine: engine,
-                options: {
-                    width: W, height: H,
-                    wireframes: false, background: 'transparent' // Прозрачный, т.к. фон в CSS
-                }
+                options: { width: W, height: H, wireframes: false, background: 'transparent' }
             });
 
             // Стены
             const wallOpts = { isStatic: true, render: { fillStyle: '#333' } };
-            const ground = Bodies.rectangle(W/2, H+30, W, 60, wallOpts);
-            const leftW = Bodies.rectangle(0, H/2, 20, H, wallOpts);
-            const rightW = Bodies.rectangle(W, H/2, 20, H, wallOpts);
-            World.add(engine.world, [ground, leftW, rightW]);
+            const ground = Matter.Bodies.rectangle(W/2, H+30, W, 60, wallOpts);
+            const leftW = Matter.Bodies.rectangle(0, H/2, 20, H, wallOpts);
+            const rightW = Matter.Bodies.rectangle(W, H/2, 20, H, wallOpts);
+            Matter.World.add(engine.world, [ground, leftW, rightW]);
 
-            // Хук для отрисовки Эмодзи/Картинок
-            Events.on(render, 'afterRender', Game.renderCustomSkins);
+            Matter.Events.on(render, 'afterRender', Game.renderCustomSkins);
+            Matter.Events.on(engine, 'collisionStart', Game.handleCollisions);
 
-            // Хук коллизий (Слияние)
-            Events.on(engine, 'collisionStart', Game.handleCollisions);
+            runner = Matter.Runner.create();
+            Matter.Runner.run(runner, engine);
+            Matter.Render.run(render);
 
-            runner = Runner.create();
-            Runner.run(runner, engine);
-            Render.run(render);
-
-            // Ввод (Мышь/Тач)
+            // СЛУШАТЕЛИ ВВОДА
+            // Используем { passive: false }, чтобы отключать дефолтные жесты
             window.addEventListener('mousedown', Game.handleInput);
-            window.addEventListener('touchstart', Game.handleInput);
+            window.addEventListener('touchstart', Game.handleInput, { passive: false });
             window.addEventListener('mousemove', Game.moveBall);
-            window.addEventListener('touchmove', Game.moveBall);
+            window.addEventListener('touchmove', Game.moveBall, { passive: false });
         },
 
         spawnNext: () => {
             if(!gameActive) return;
-            // Генерируем новый шар
-            nextBallIndex = Math.floor(Math.random() * 3); // Только мелкие
+            nextBallIndex = Math.floor(Math.random() * 3);
             const size = BALL_SIZES[nextBallIndex];
             const skinData = SKINS_DB[currentSkin];
             const levelData = skinData.levels[nextBallIndex];
 
-            // Показываем в превью
             document.getElementById('next-ball-preview').innerText = levelData.label;
 
-            // Создаем физическое тело (но пока статичное)
             currentBall = Matter.Bodies.circle(W/2, 60, size, {
                 isStatic: true,
                 label: nextBallIndex,
@@ -355,27 +354,37 @@
         handleInput: (e) => {
             if(!gameActive) return;
 
-            // РЕЖИМ БАФФА (Уничтожение)
+            // ВАЖНО: Проверка, куда кликнули
+            const target = e.target;
+
+            // Если кликнули на кнопку или внутри меню - не сбрасываем шар
+            if (target.tagName === 'BUTTON' || target.closest('button') || target.closest('.interactive')) {
+                return;
+            }
+
+            // РЕЖИМ УНИЧТОЖЕНИЯ (Молоток)
             if(isBuffActive) {
                 const x = (e.touches ? e.touches[0].clientX : e.clientX);
                 const y = (e.touches ? e.touches[0].clientY : e.clientY);
 
-                // Ищем тело под курсором
                 const bodies = Matter.Composite.allBodies(engine.world);
+                // Ищем тело под пальцем
                 const clickedBody = bodies.find(b => Matter.Bounds.contains(b.bounds, {x:x, y:y}) && !b.isStatic);
 
                 if(clickedBody) {
                     Game.createExplosionEffect(clickedBody.position.x, clickedBody.position.y);
                     Matter.World.remove(engine.world, clickedBody);
+                    // Выключаем режим
                     isBuffActive = false;
-                    document.getElementById('buff-btn').classList.remove('active');
-                    document.body.classList.remove('destroy-cursor');
-                    document.getElementById('buff-btn').innerText = `🔨 УНИЧТОЖИТЬ`;
+                    document.body.classList.remove('destroy-mode');
+                    document.getElementById('buff-btn').classList.remove('ready');
+                    document.getElementById('buff-icon').innerText = "🔨";
+                    Game.updateUI();
                 }
                 return;
             }
 
-            // РЕЖИМ СБРОСА
+            // ОБЫЧНЫЙ БРОСОК
             if(canDrop && currentBall) {
                 let x = (e.touches ? e.touches[0].clientX : e.clientX);
                 x = Math.max(30, Math.min(x, W - 30));
@@ -399,10 +408,8 @@
                         const midX = (bodyA.position.x + bodyB.position.x)/2;
                         const midY = (bodyA.position.y + bodyB.position.y)/2;
 
-                        // Удаляем старые
                         Matter.World.remove(engine.world, [bodyA, bodyB]);
 
-                        // Создаем новый
                         const skin = SKINS_DB[currentSkin];
                         const level = skin.levels[newIdx];
                         const size = BALL_SIZES[newIdx];
@@ -414,7 +421,6 @@
                         });
                         Matter.World.add(engine.world, newBody);
 
-                        // Эффекты
                         score += level.score;
                         Game.updateUI();
                         Game.playSound('merge');
@@ -424,28 +430,36 @@
         },
 
         activateBuff: () => {
+            // Проверяем, хватает ли очков (2500)
             if(score - lastBuffScore >= 2500 && !isBuffActive) {
                 isBuffActive = true;
-                lastBuffScore = score; // Сбрасываем счетчик баффа (но не общий счет)
-                document.body.classList.add('destroy-cursor');
-                document.getElementById('buff-btn').classList.remove('active');
-                document.getElementById('buff-btn').innerText = "❌ ВЫБЕРИ ЦЕЛЬ";
+                lastBuffScore = score; // Списываем "заряд"
+
+                document.body.classList.add('destroy-mode');
+                // Визуально показываем, что молот активен
+                const btn = document.getElementById('buff-btn');
+                btn.classList.remove('ready'); // Перестает пульсировать
+                document.getElementById('buff-icon').innerText = "❌";
+
+                // Сброс полоски прогресса
+                document.getElementById('buff-progress').style.height = '0%';
             }
         },
 
         updateUI: () => {
             document.getElementById('score-val').innerText = score;
 
-            const btn = document.getElementById('buff-btn');
-            const progress = score - lastBuffScore;
+            // Логика прогресса молотка
+            const progress = Math.min(score - lastBuffScore, 2500);
+            const percentage = (progress / 2500) * 100;
 
+            document.getElementById('buff-progress').style.height = percentage + '%';
+
+            const btn = document.getElementById('buff-btn');
             if(progress >= 2500) {
-                if(!btn.classList.contains('active') && !isBuffActive) {
-                    btn.classList.add('active');
-                    btn.innerText = "🔥 ГОТОВО (ЖМИ)";
+                if(!btn.classList.contains('ready') && !isBuffActive) {
+                    btn.classList.add('ready');
                 }
-            } else {
-                btn.innerText = `🔨 ${progress}/2500`;
             }
         },
 
@@ -464,29 +478,21 @@
                     const size = BALL_SIZES[body.label];
 
                     if(skin.type === 'image' && lvlData.file) {
-                        // Отрисовка КАРТИНКИ
-                        // В реальном проекте картинки надо предзагрузить. 
-                        // Здесь упрощенная логика:
                         const img = new Image();
                         img.src = skin.path + lvlData.file;
-                        // Примечание: Это плохой способ (создавать Image в render loop).
-                        // Но для примера сойдет. В проде нужно кэширование.
                         if(img.complete) {
                             ctx.drawImage(img, body.position.x - size, body.position.y - size, size*2, size*2);
                         } else {
-                            // Пока не загрузилась - рисуем эмодзи
                             ctx.font = `${size*1.2}px Arial`;
                             ctx.fillText(lvlData.label, body.position.x, body.position.y);
                         }
                     } else {
-                        // Отрисовка ЭМОДЗИ
                         ctx.font = `${size*1.2}px Arial`;
                         ctx.fillText(lvlData.label, body.position.x, body.position.y + (size*0.1));
                     }
                 }
             });
 
-            // Линия смерти
             ctx.beginPath();
             ctx.moveTo(0, 150);
             ctx.lineTo(W, 150);
@@ -494,7 +500,6 @@
             ctx.setLineDash([10, 15]);
             ctx.stroke();
 
-            // Проверка проигрыша
             Game.checkGameOver(bodies);
         },
 
@@ -509,12 +514,10 @@
         },
 
         playSound: (type) => {
-            // Простейшая генерация звука (писк), если нет файла
             if(SOUNDS_CFG[type]) {
                const audio = new Audio(SOUNDS_CFG[type]);
                audio.play().catch(e=>{});
             } else {
-                // Синтезируем звук, чтобы было слышно хоть что-то
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.connect(gain);
@@ -528,12 +531,10 @@
         },
 
         createExplosionEffect: (x, y) => {
-            // Тут можно добавить частицы
-            console.log("BOOM at", x, y);
+           // Заглушка для эффекта
         }
     };
 
-    // Предотвращаем скролл
     document.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 </script>
 </body>
