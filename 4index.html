@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Merge Game 2.1</title>
+    <title>Merge Game 2.3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- СТИЛИ ИНТЕРФЕЙСА --- */
         body { margin: 0; padding: 0; overflow: hidden; background: #121212; font-family: 'Segoe UI', sans-serif; touch-action: none; color: white; -webkit-tap-highlight-color: transparent; }
-        #game-container { position: relative; width: 100vw; height: 100vh; }
+        #game-container { position: relative; width: 100%; height: 100vh; }
 
         /* СЛОИ */
         .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -18,23 +18,42 @@
         #hud {
             display: flex; justify-content: space-between; align-items: flex-start;
             padding: 15px; box-sizing: border-box; z-index: 5;
-            /* Важно: сам слой пропускает клики, чтобы можно было играть */
+            position: absolute; top: 0; left: 0; width: 100%;
             pointer-events: none; 
         }
 
+        #hud > * { pointer-events: auto; }
+
         /* Счет слева */
         .score-box {
-            background: rgba(0,0,0,0.5);
-            padding: 8px 15px;
-            border-radius: 20px;
-            pointer-events: auto; /* Чтобы кнопки меню работали, если добавить */
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
         }
-        .score-val { font-size: 20px; font-weight: bold; color: #fff; }
-        .next-preview { font-size: 12px; color: #ccc; margin-top: 2px; }
+        .score-val { font-size: 22px; font-weight: bold; color: #fff; }
 
-        /* Кнопка БАФФА (Справа сверху, круглая) */
+        /* Блок "Следующий" */
+        .next-box {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; color: #ccc;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 5px; margin-top: 2px;
+        }
+        .next-circle {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 14px;
+            background: #333;
+        }
+
+        /* Кнопка БАФФА */
         #buff-container {
-            pointer-events: auto; /* Кнопка должна нажиматься */
             display: flex; flex-direction: column; align-items: center;
         }
 
@@ -49,18 +68,17 @@
             position: relative;
             transition: transform 0.1s;
             overflow: hidden;
+            user-select: none;
         }
 
-        /* Анимация заполнения (прогресс) */
         #buff-progress {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
-            background: rgba(255, 204, 0, 0.5);
+            background: rgba(255, 204, 0, 0.6);
             transition: height 0.5s;
             z-index: 1;
         }
         #buff-icon { z-index: 2; position: relative; }
 
-        /* Активное состояние баффа */
         #buff-btn.ready {
             background: #ffcc00; border-color: #fff; color: #000;
             box-shadow: 0 0 15px #ffcc00;
@@ -98,15 +116,8 @@
         }
         .list-item.selected { background: #004466; }
 
-        /* Эффект курсора для баффа */
-        .destroy-mode { 
-            cursor: crosshair !important; 
-        }
-        /* Красная рамка когда режим уничтожения */
-        .destroy-mode #game-container {
-            border: 4px solid red;
-            box-sizing: border-box;
-        }
+        .destroy-mode { cursor: crosshair !important; }
+        .destroy-mode #game-container { border: 4px solid red; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -144,15 +155,18 @@
 
     <!-- HUD ИГРЫ -->
     <div id="hud" class="layer hidden">
-        <!-- СЧЕТ -->
+        <!-- СЧЕТ и NEXT -->
         <div class="score-box">
             <div class="score-val">🏆 <span id="score-val">0</span></div>
-            <div class="next-preview">След: <span id="next-ball-preview"></span></div>
+            <div class="next-box">
+                <span>Далее:</span>
+                <div class="next-circle" id="next-ball-icon">?</div>
+            </div>
         </div>
 
         <!-- МОЛОТОК (Справа) -->
         <div id="buff-container">
-            <div id="buff-btn" onclick="Game.activateBuff()">
+            <div id="buff-btn" onclick="Game.activateBuff()" ontouchstart="event.stopPropagation()">
                 <div id="buff-progress"></div>
                 <span id="buff-icon">🔨</span>
             </div>
@@ -206,20 +220,32 @@
        ========================================== */
     let currentSkin = 'memes';
     let engine, render, runner;
+    let ground, leftW, rightW;
     let score = 0;
     let lastBuffScore = 0;
     let isBuffActive = false;
     let gameActive = false;
     let currentBall = null;
     let canDrop = true;
-    let nextBallIndex = 0;
 
-    const W = window.innerWidth;
-    const H = window.innerHeight;
+    // ЛОГИКА "NEXT"
+    // Мы храним индекс шара, который будет СЛЕДУЮЩИМ (показан в углу)
+    let upcomingBallIndex = 0; 
+
+    let W = window.innerWidth;
+    let H = window.innerHeight;
     const BALL_SIZES = [20, 30, 40, 50, 60, 70, 80, 90, 100];
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // МЕНЕДЖЕР МЕНЮ
+    // Блокировка нажатий
+    function stopPropagation(e) { e.stopPropagation(); }
+    document.getElementById('hud').addEventListener('mousedown', stopPropagation);
+    document.getElementById('hud').addEventListener('touchstart', stopPropagation);
+    document.querySelectorAll('.menu-overlay').forEach(el => {
+        el.addEventListener('mousedown', stopPropagation);
+        el.addEventListener('touchstart', stopPropagation);
+    });
+
     const Menu = {
         hideAll: () => {
             document.querySelectorAll('.menu-overlay').forEach(el => el.classList.add('hidden'));
@@ -272,7 +298,6 @@
         }
     };
 
-    // ИГРОВАЯ ЛОГИКА
     const Game = {
         start: () => {
             Menu.hideAll();
@@ -283,9 +308,13 @@
             Game.initPhysics();
             score = 0;
             lastBuffScore = 0;
+
+            // Генерируем ПЕРВЫЙ "следующий" шар
+            upcomingBallIndex = Math.floor(Math.random() * 5); // 0-4 уровни
+
             Game.updateUI();
             gameActive = true;
-            Game.spawnNext();
+            Game.spawnNext(); // Здесь создастся шар из upcoming, а upcoming обновится
         },
 
         initPhysics: () => {
@@ -295,6 +324,8 @@
                 if(render) { render.canvas.remove(); render.canvas = null; render.context = null; }
                 if(runner) Matter.Runner.stop(runner);
             }
+            W = window.innerWidth;
+            H = window.innerHeight;
 
             engine = Matter.Engine.create();
             render = Matter.Render.create({
@@ -303,11 +334,11 @@
                 options: { width: W, height: H, wireframes: false, background: 'transparent' }
             });
 
-            // Стены
             const wallOpts = { isStatic: true, render: { fillStyle: '#333' } };
-            const ground = Matter.Bodies.rectangle(W/2, H+30, W, 60, wallOpts);
-            const leftW = Matter.Bodies.rectangle(0, H/2, 20, H, wallOpts);
-            const rightW = Matter.Bodies.rectangle(W, H/2, 20, H, wallOpts);
+            ground = Matter.Bodies.rectangle(W/2, H + 50, W, 100, wallOpts); 
+            leftW = Matter.Bodies.rectangle(0, H/2, 20, H, wallOpts);
+            rightW = Matter.Bodies.rectangle(W, H/2, 20, H, wallOpts);
+
             Matter.World.add(engine.world, [ground, leftW, rightW]);
 
             Matter.Events.on(render, 'afterRender', Game.renderCustomSkins);
@@ -317,26 +348,45 @@
             Matter.Runner.run(runner, engine);
             Matter.Render.run(render);
 
-            // СЛУШАТЕЛИ ВВОДА
-            // Используем { passive: false }, чтобы отключать дефолтные жесты
             window.addEventListener('mousedown', Game.handleInput);
             window.addEventListener('touchstart', Game.handleInput, { passive: false });
             window.addEventListener('mousemove', Game.moveBall);
             window.addEventListener('touchmove', Game.moveBall, { passive: false });
+            window.addEventListener('resize', Game.handleResize);
+        },
+
+        handleResize: () => {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            render.canvas.width = W;
+            render.canvas.height = H;
+            Matter.Body.setPosition(ground, { x: W/2, y: H + 50 });
+            Matter.Body.setPosition(rightW, { x: W, y: H/2 });
         },
 
         spawnNext: () => {
             if(!gameActive) return;
-            nextBallIndex = Math.floor(Math.random() * 3);
-            const size = BALL_SIZES[nextBallIndex];
-            const skinData = SKINS_DB[currentSkin];
-            const levelData = skinData.levels[nextBallIndex];
 
-            document.getElementById('next-ball-preview').innerText = levelData.label;
+            // 1. Берем шар, который был в "очереди"
+            const indexToSpawn = upcomingBallIndex;
+
+            // 2. Генерируем НОВЫЙ шар для очереди (0-4 уровень)
+            upcomingBallIndex = Math.floor(Math.random() * 5);
+
+            // 3. Обновляем иконку "След." в интерфейсе
+            const skin = SKINS_DB[currentSkin];
+            const nextLevelData = skin.levels[upcomingBallIndex];
+            const nextIconEl = document.getElementById('next-ball-icon');
+            nextIconEl.innerText = nextLevelData.label;
+            nextIconEl.style.backgroundColor = nextLevelData.color;
+
+            // 4. Создаем физический шар в руках
+            const size = BALL_SIZES[indexToSpawn];
+            const levelData = skin.levels[indexToSpawn];
 
             currentBall = Matter.Bodies.circle(W/2, 60, size, {
                 isStatic: true,
-                label: nextBallIndex,
+                label: indexToSpawn, // Это индекс уровня
                 render: { fillStyle: levelData.color }
             });
             Matter.World.add(engine.world, currentBall);
@@ -353,28 +403,18 @@
 
         handleInput: (e) => {
             if(!gameActive) return;
+            if(e.target.closest('#hud') || e.target.closest('.menu-overlay')) return;
 
-            // ВАЖНО: Проверка, куда кликнули
-            const target = e.target;
-
-            // Если кликнули на кнопку или внутри меню - не сбрасываем шар
-            if (target.tagName === 'BUTTON' || target.closest('button') || target.closest('.interactive')) {
-                return;
-            }
-
-            // РЕЖИМ УНИЧТОЖЕНИЯ (Молоток)
+            // МОЛОТОК
             if(isBuffActive) {
                 const x = (e.touches ? e.touches[0].clientX : e.clientX);
                 const y = (e.touches ? e.touches[0].clientY : e.clientY);
 
                 const bodies = Matter.Composite.allBodies(engine.world);
-                // Ищем тело под пальцем
                 const clickedBody = bodies.find(b => Matter.Bounds.contains(b.bounds, {x:x, y:y}) && !b.isStatic);
 
                 if(clickedBody) {
-                    Game.createExplosionEffect(clickedBody.position.x, clickedBody.position.y);
                     Matter.World.remove(engine.world, clickedBody);
-                    // Выключаем режим
                     isBuffActive = false;
                     document.body.classList.remove('destroy-mode');
                     document.getElementById('buff-btn').classList.remove('ready');
@@ -384,7 +424,7 @@
                 return;
             }
 
-            // ОБЫЧНЫЙ БРОСОК
+            // БРОСОК
             if(canDrop && currentBall) {
                 let x = (e.touches ? e.touches[0].clientX : e.clientX);
                 x = Math.max(30, Math.min(x, W - 30));
@@ -401,58 +441,63 @@
             const pairs = event.pairs;
             pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
-                if(bodyA.label === bodyB.label && Number.isInteger(bodyA.label)) {
-                    const idx = bodyA.label;
-                    if(idx < BALL_SIZES.length - 1) {
-                        const newIdx = idx + 1;
-                        const midX = (bodyA.position.x + bodyB.position.x)/2;
-                        const midY = (bodyA.position.y + bodyB.position.y)/2;
 
+                // Проверяем, что это игровые шары (label - число)
+                if(Number.isInteger(bodyA.label) && Number.isInteger(bodyB.label)) {
+                    if(bodyA.label === bodyB.label) {
+                        const idx = bodyA.label;
+
+                        // Удаляем старые шары
                         Matter.World.remove(engine.world, [bodyA, bodyB]);
 
-                        const skin = SKINS_DB[currentSkin];
-                        const level = skin.levels[newIdx];
-                        const size = BALL_SIZES[newIdx];
+                        // --- ЛОГИКА АРБУЗОВ (МАКС УРОВЕНЬ) ---
+                        if (idx === BALL_SIZES.length - 1) {
+                            // Если соединились два последних шара - они исчезают
+                            score += 1000; // Бонус
+                            Game.playSound('merge');
+                        } else {
+                            // Обычное слияние
+                            const newIdx = idx + 1;
+                            const midX = (bodyA.position.x + bodyB.position.x)/2;
+                            const midY = (bodyA.position.y + bodyB.position.y)/2;
 
-                        const newBody = Matter.Bodies.circle(midX, midY, size, {
-                            label: newIdx,
-                            restitution: 0.3,
-                            render: { fillStyle: level.color }
-                        });
-                        Matter.World.add(engine.world, newBody);
+                            const skin = SKINS_DB[currentSkin];
+                            const level = skin.levels[newIdx];
+                            const size = BALL_SIZES[newIdx];
 
-                        score += level.score;
+                            const newBody = Matter.Bodies.circle(midX, midY, size, {
+                                label: newIdx,
+                                restitution: 0.3,
+                                render: { fillStyle: level.color }
+                            });
+                            Matter.World.add(engine.world, newBody);
+
+                            score += level.score;
+                            Game.playSound('merge');
+                        }
+
                         Game.updateUI();
-                        Game.playSound('merge');
                     }
                 }
             });
         },
 
-        activateBuff: () => {
-            // Проверяем, хватает ли очков (2500)
+        activateBuff: (e) => {
             if(score - lastBuffScore >= 2500 && !isBuffActive) {
                 isBuffActive = true;
-                lastBuffScore = score; // Списываем "заряд"
-
+                lastBuffScore = score;
                 document.body.classList.add('destroy-mode');
-                // Визуально показываем, что молот активен
                 const btn = document.getElementById('buff-btn');
-                btn.classList.remove('ready'); // Перестает пульсировать
+                btn.classList.remove('ready'); 
                 document.getElementById('buff-icon').innerText = "❌";
-
-                // Сброс полоски прогресса
                 document.getElementById('buff-progress').style.height = '0%';
             }
         },
 
         updateUI: () => {
             document.getElementById('score-val').innerText = score;
-
-            // Логика прогресса молотка
             const progress = Math.min(score - lastBuffScore, 2500);
             const percentage = (progress / 2500) * 100;
-
             document.getElementById('buff-progress').style.height = percentage + '%';
 
             const btn = document.getElementById('buff-btn');
@@ -493,6 +538,7 @@
                 }
             });
 
+            // Линия смерти
             ctx.beginPath();
             ctx.moveTo(0, 150);
             ctx.lineTo(W, 150);
@@ -528,10 +574,6 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.1);
             }
-        },
-
-        createExplosionEffect: (x, y) => {
-           // Заглушка для эффекта
         }
     };
 
