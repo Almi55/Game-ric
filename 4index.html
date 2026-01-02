@@ -3,41 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Merge Game 2.4</title>
+    <title>Merge Game 2.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- СТИЛИ ИНТЕРФЕЙСА --- */
         body { margin: 0; padding: 0; overflow: hidden; background: #121212; font-family: 'Segoe UI', sans-serif; touch-action: none; color: white; -webkit-tap-highlight-color: transparent; }
         #game-container { position: relative; width: 100%; height: 100vh; }
 
-        /* СЛОИ */
         .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         .interactive { pointer-events: auto; }
 
-        /* HUD (Верхняя панель) */
+        /* HUD */
         #hud {
             display: flex; justify-content: space-between; align-items: flex-start;
             padding: 15px; box-sizing: border-box; z-index: 5;
             position: absolute; top: 0; left: 0; width: 100%;
             pointer-events: none; 
         }
-
         #hud > * { pointer-events: auto; }
 
-        /* Счет слева */
+        /* Счет */
         .score-box {
             background: rgba(0,0,0,0.6);
             padding: 10px 15px;
             border-radius: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+            display: flex; flex-direction: column; gap: 5px;
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255,255,255,0.1);
         }
         .score-val { font-size: 22px; font-weight: bold; color: #fff; }
 
-        /* Блок "Следующий" */
         .next-box {
             display: flex; align-items: center; gap: 8px;
             font-size: 13px; color: #ccc;
@@ -45,64 +40,56 @@
             padding-top: 5px; margin-top: 2px;
         }
         .next-circle {
-            width: 20px; height: 20px;
-            border-radius: 50%;
+            width: 20px; height: 20px; border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            font-size: 14px;
-            background: #333;
+            font-size: 14px; background: #333;
         }
 
-        /* Кнопка БАФФА */
-        #buff-container {
+        /* КОНТЕЙНЕР БАФФОВ (Справа) */
+        #buffs-wrapper {
+            display: flex; flex-direction: column; gap: 15px;
+            align-items: flex-end;
+        }
+
+        .buff-item {
             display: flex; flex-direction: column; align-items: center;
         }
 
-        #buff-btn {
+        .buff-btn {
             width: 50px; height: 50px;
             border-radius: 50%;
-            background: #333;
-            border: 2px solid #555;
+            background: #333; border: 2px solid #555;
             display: flex; justify-content: center; align-items: center;
-            font-size: 24px;
-            cursor: pointer;
-            position: relative;
-            transition: transform 0.1s;
-            overflow: visible; /* Чтобы значок кол-ва не обрезался */
-            user-select: none;
+            font-size: 22px; cursor: pointer;
+            position: relative; transition: transform 0.1s;
+            overflow: visible; user-select: none;
         }
 
-        /* Счетчик зарядов */
-        #buff-count-badge {
-            position: absolute;
-            top: -5px; right: -5px;
+        .buff-badge {
+            position: absolute; top: -5px; right: -5px;
             background: red; color: white;
-            font-size: 12px; font-weight: bold;
-            width: 20px; height: 20px;
-            border-radius: 50%;
+            font-size: 11px; font-weight: bold;
+            width: 18px; height: 18px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            border: 2px solid #121212;
-            z-index: 10;
+            border: 2px solid #121212; z-index: 10;
             opacity: 0; transition: opacity 0.3s;
         }
-        #buff-count-badge.visible { opacity: 1; }
+        .buff-badge.visible { opacity: 1; }
 
-        /* Прогресс бар */
-        #buff-progress {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
-            background: rgba(255, 204, 0, 0.6);
-            transition: height 0.3s;
-            z-index: 1; border-radius: 0 0 50px 50px;
+        /* Круговой прогресс через CSS conic-gradient (проще для двух кнопок) */
+        .buff-btn::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%; z-index: 1; opacity: 0.3; transition: 0.3s;
         }
-        #buff-icon { z-index: 2; position: relative; }
 
-        #buff-btn.ready {
-            background: #444; border-color: #ffcc00; color: #fff;
-            box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
-        }
-        #buff-btn.active-mode {
-            background: #ffcc00; color: #000;
-            animation: pulse 1.0s infinite;
-        }
+        /* Стили состояний */
+        .buff-btn.ready { border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.3); }
+
+        /* Активный режим */
+        .buff-btn.active-hammer { background: #ffcc00; color: black; animation: pulse 1s infinite; border-color: #ffcc00; }
+        .buff-btn.active-bomb { background: #ff4444; color: white; animation: pulse 1s infinite; border-color: #ff4444; }
+
+        .cost-label { font-size: 10px; margin-top: 3px; opacity: 0.7; }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
@@ -123,26 +110,23 @@
         .menu-btn:active { transform: scale(0.95); }
         .btn-primary { background: #0088cc; border: none; font-weight: bold; }
 
-        /* Списки */
-        .scroll-list {
-            width: 80%; max-height: 50%; overflow-y: auto;
-            background: #222; border-radius: 10px; padding: 10px; margin-bottom: 20px;
-        }
-        .list-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px; border-bottom: 1px solid #333; cursor: pointer;
-        }
+        .scroll-list { width: 80%; max-height: 50%; overflow-y: auto; background: #222; border-radius: 10px; padding: 10px; margin-bottom: 20px; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #333; cursor: pointer; }
         .list-item.selected { background: #004466; }
 
-        /* Режим уничтожения */
-        .destroy-mode { cursor: crosshair !important; }
-        .destroy-mode #game-container { border: 4px solid red; box-sizing: border-box; }
+        /* Курсоры для режимов */
+        .mode-hammer { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><text y="20" font-size="20">🔨</text></svg>'), auto !important; }
+        .mode-bomb { cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><text y="20" font-size="20">💣</text></svg>'), auto !important; }
+
+        .mode-active #game-container { border: 4px solid; box-sizing: border-box; }
+        .mode-hammer #game-container { border-color: #ffcc00; }
+        .mode-bomb #game-container { border-color: #ff4444; }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <!-- ГЛАВНОЕ МЕНЮ -->
+    <!-- МЕНЮ -->
     <div id="main-menu" class="layer interactive menu-overlay">
         <h1>MEME DROP</h1>
         <button class="menu-btn btn-primary" onclick="Game.start()">ИГРАТЬ</button>
@@ -150,21 +134,18 @@
         <button class="menu-btn" onclick="Menu.showLeaderboard()">РЕКОРДЫ</button>
     </div>
 
-    <!-- МЕНЮ СКИНОВ -->
     <div id="skins-menu" class="layer interactive menu-overlay hidden">
         <h2>ВЫБОР СКИНА</h2>
         <div class="scroll-list" id="skins-list"></div>
         <button class="menu-btn" onclick="Menu.backToMain()">НАЗАД</button>
     </div>
 
-    <!-- ТАБЛИЦА ЛИДЕРОВ -->
     <div id="leaderboard-menu" class="layer interactive menu-overlay hidden">
         <h2>ТОП ИГРОКОВ</h2>
         <div class="scroll-list" id="leaderboard-list"></div>
         <button class="menu-btn" onclick="Menu.backToMain()">НАЗАД</button>
     </div>
 
-    <!-- МЕНЮ GAME OVER -->
     <div id="game-over-menu" class="layer interactive menu-overlay hidden">
         <h1 style="-webkit-text-fill-color: red;">GAME OVER</h1>
         <p>Счет: <span id="final-score">0</span></p>
@@ -172,9 +153,8 @@
         <button class="menu-btn" onclick="Menu.backToMain()">МЕНЮ</button>
     </div>
 
-    <!-- HUD ИГРЫ -->
+    <!-- HUD -->
     <div id="hud" class="layer hidden">
-        <!-- СЧЕТ и NEXT -->
         <div class="score-box">
             <div class="score-val">🏆 <span id="score-val">0</span></div>
             <div class="next-box">
@@ -183,28 +163,34 @@
             </div>
         </div>
 
-        <!-- МОЛОТОК (Справа) -->
-        <div id="buff-container">
-            <div id="buff-btn" onclick="Game.activateBuff()" ontouchstart="event.stopPropagation()">
-                <div id="buff-progress"></div>
-                <span id="buff-icon">🔨</span>
-                <div id="buff-count-badge">1</div>
+        <div id="buffs-wrapper">
+            <!-- МОЛОТОК (2500) -->
+            <div class="buff-item">
+                <div id="btn-hammer" class="buff-btn" onclick="Game.toggleBuff('hammer')" ontouchstart="event.stopPropagation()">
+                    <span id="icon-hammer">🔨</span>
+                    <div id="badge-hammer" class="buff-badge">0</div>
+                </div>
+                <div class="cost-label">2500</div>
             </div>
-            <div style="font-size:10px; margin-top:5px; opacity:0.7">2500 pts</div>
+
+            <!-- БОМБА (4000) -->
+            <div class="buff-item">
+                <div id="btn-bomb" class="buff-btn" onclick="Game.toggleBuff('bomb')" ontouchstart="event.stopPropagation()">
+                    <span id="icon-bomb">💣</span>
+                    <div id="badge-bomb" class="buff-badge">0</div>
+                </div>
+                <div class="cost-label">4000</div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    /* ==========================================
-       КОНФИГУРАЦИЯ
-       ========================================== */
     const SOUNDS_CFG = { merge: null, drop: null, gameover: null };
 
     const SKINS_DB = {
         'memes': {
-            name: 'Мемы (Default)',
-            type: 'emoji',
+            name: 'Мемы',
             levels: [
                 { color: '#FFD700', label: '🤡', score: 2 },
                 { color: '#FFA500', label: '💩', score: 4 },
@@ -215,12 +201,11 @@
                 { color: '#4169E1', label: '💎', score: 128 },
                 { color: '#00BFFF', label: '👑', score: 256 },
                 { color: '#00FA9A', label: '🗿', score: 512 }
-            ]
+            ],
+            type: 'emoji'
         },
         'fruits': {
             name: 'Фрукты',
-            type: 'emoji', 
-            path: '', 
             levels: [
                 { color: '#F00', label: '🍒', score: 2 },
                 { color: '#F00', label: '🍓', score: 4 },
@@ -231,36 +216,12 @@
                 { color: '#FFFF00', label: '🍐', score: 128 },
                 { color: '#FFC0CB', label: '🍑', score: 256 },
                 { color: '#008000', label: '🍉', score: 512 }
-            ]
+            ],
+            type: 'emoji'
         }
     };
 
-    /* ==========================================
-       ДВИЖОК
-       ========================================== */
-    let currentSkin = 'memes';
-    let engine, render, runner;
-    let ground, leftW, rightW;
-    let score = 0;
-
-    // БАФФЫ (НАКОПИТЕЛЬНАЯ СИСТЕМА)
-    let hammersUsed = 0; // Сколько молотков мы потратили
-    const SCORE_PER_HAMMER = 2500;
-
-    let isBuffActive = false;
-    let gameActive = false;
-    let currentBall = null;
-    let canDrop = true;
-    let upcomingBallIndex = 0; 
-
-    let W = window.innerWidth;
-    let H = window.innerHeight;
-
-    // РАЗМЕРЫ (-10% от версии 2.3)
-    const BALL_SIZES = [18, 27, 36, 45, 54, 63, 72, 81, 90];
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
+    // Блокировка всплытия (для кнопок)
     function stopPropagation(e) { e.stopPropagation(); }
     document.getElementById('hud').addEventListener('mousedown', stopPropagation);
     document.getElementById('hud').addEventListener('touchstart', stopPropagation);
@@ -269,14 +230,66 @@
         el.addEventListener('touchstart', stopPropagation);
     });
 
+    // Система частиц
+    const Particles = {
+        list: [],
+        spawn: (x, y, color) => {
+            for(let i=0; i<12; i++) {
+                Particles.list.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15,
+                    life: 1.0,
+                    color: color,
+                    size: Math.random() * 5 + 2
+                });
+            }
+        },
+        update: () => {
+            for(let i = Particles.list.length - 1; i >= 0; i--) {
+                let p = Particles.list[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if(p.life <= 0) Particles.list.splice(i, 1);
+            }
+        },
+        draw: (ctx) => {
+            Particles.list.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+        }
+    };
+
+    let currentSkin = 'memes';
+    let engine, render, runner;
+    let ground, leftW, rightW;
+    let score = 0;
+
+    // БАФФЫ
+    const COST_HAMMER = 2500;
+    const COST_BOMB = 4000;
+    let hammersUsed = 0;
+    let bombsUsed = 0;
+    let activeBuff = null; // 'hammer' | 'bomb' | null
+
+    let gameActive = false;
+    let currentBall = null;
+    let canDrop = true;
+    let upcomingBallIndex = 0; 
+    let W = window.innerWidth;
+    let H = window.innerHeight;
+    const BALL_SIZES = [18, 27, 36, 45, 54, 63, 72, 81, 90];
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
     const Menu = {
-        hideAll: () => {
-            document.querySelectorAll('.menu-overlay').forEach(el => el.classList.add('hidden'));
-        },
-        backToMain: () => {
-            Menu.hideAll();
-            document.getElementById('main-menu').classList.remove('hidden');
-        },
+        hideAll: () => document.querySelectorAll('.menu-overlay').forEach(el => el.classList.add('hidden')),
+        backToMain: () => { Menu.hideAll(); document.getElementById('main-menu').classList.remove('hidden'); },
         showSkins: () => {
             Menu.hideAll();
             document.getElementById('skins-menu').classList.remove('hidden');
@@ -287,11 +300,7 @@
                 const div = document.createElement('div');
                 div.className = `list-item ${currentSkin === key ? 'selected' : ''}`;
                 div.innerHTML = `<span>${skin.name}</span> <span>${skin.levels[0].label}</span>`;
-                div.onclick = () => {
-                    currentSkin = key;
-                    localStorage.setItem('selectedSkin', key);
-                    Menu.showSkins();
-                };
+                div.onclick = () => { currentSkin = key; localStorage.setItem('selectedSkin', key); Menu.showSkins(); };
                 list.appendChild(div);
             }
         },
@@ -315,8 +324,7 @@
             document.getElementById('final-score').innerText = score;
             document.getElementById('game-over-menu').classList.remove('hidden');
             let records = JSON.parse(localStorage.getItem('leaderboard')) || [];
-            let name = "Игрок"; 
-            records.push({name: name, score: score, date: new Date()});
+            records.push({name: "Игрок", score: score, date: new Date()});
             localStorage.setItem('leaderboard', JSON.stringify(records));
         }
     };
@@ -331,11 +339,11 @@
             Game.initPhysics();
             score = 0;
             hammersUsed = 0;
-            isBuffActive = false;
+            bombsUsed = 0;
+            Game.deactivateBuffs();
+            Particles.list = [];
 
-            // Генерируем ПЕРВЫЙ "следующий" шар (ТОЛЬКО 0, 1, 2)
             upcomingBallIndex = Math.floor(Math.random() * 3); 
-
             Game.updateUI();
             gameActive = true;
             Game.spawnNext();
@@ -362,10 +370,13 @@
             ground = Matter.Bodies.rectangle(W/2, H + 50, W, 100, wallOpts); 
             leftW = Matter.Bodies.rectangle(0, H/2, 20, H, wallOpts);
             rightW = Matter.Bodies.rectangle(W, H/2, 20, H, wallOpts);
-
             Matter.World.add(engine.world, [ground, leftW, rightW]);
 
-            Matter.Events.on(render, 'afterRender', Game.renderCustomSkins);
+            Matter.Events.on(render, 'afterRender', () => {
+                Game.renderCustomSkins();
+                Particles.update();
+                Particles.draw(render.context);
+            });
             Matter.Events.on(engine, 'collisionStart', Game.handleCollisions);
 
             runner = Matter.Runner.create();
@@ -390,10 +401,7 @@
 
         spawnNext: () => {
             if(!gameActive) return;
-
             const indexToSpawn = upcomingBallIndex;
-
-            // Генерируем следующий (ТОЛЬКО УРОВНИ 0, 1, 2)
             upcomingBallIndex = Math.floor(Math.random() * 3);
 
             const skin = SKINS_DB[currentSkin];
@@ -406,16 +414,17 @@
             const levelData = skin.levels[indexToSpawn];
 
             currentBall = Matter.Bodies.circle(W/2, 60, size, {
-                isStatic: true,
-                label: indexToSpawn,
-                render: { fillStyle: levelData.color }
+                isStatic: true, label: indexToSpawn, render: { fillStyle: levelData.color }
             });
             Matter.World.add(engine.world, currentBall);
             canDrop = true;
         },
 
         moveBall: (e) => {
-            if(canDrop && currentBall && !isBuffActive) {
+            // ФИКС: Если палец над HUD или кнопкой, не двигаем шар
+            if(e.target.closest('#hud') || e.target.closest('.interactive')) return;
+
+            if(canDrop && currentBall && !activeBuff) {
                 let x = (e.touches ? e.touches[0].clientX : e.clientX);
                 x = Math.max(30, Math.min(x, W - 30));
                 Matter.Body.setPosition(currentBall, { x: x, y: 60 });
@@ -424,24 +433,38 @@
 
         handleInput: (e) => {
             if(!gameActive) return;
+            // Пропускаем клики по интерфейсу
             if(e.target.closest('#hud') || e.target.closest('.menu-overlay')) return;
 
-            // МОЛОТОК (УНИЧТОЖЕНИЕ)
-            if(isBuffActive) {
+            // ОБРАБОТКА БАФФОВ
+            if(activeBuff) {
                 const x = (e.touches ? e.touches[0].clientX : e.clientX);
                 const y = (e.touches ? e.touches[0].clientY : e.clientY);
-
                 const bodies = Matter.Composite.allBodies(engine.world);
-                const clickedBody = bodies.find(b => Matter.Bounds.contains(b.bounds, {x:x, y:y}) && !b.isStatic);
+                // Ищем тело под кликом (игнорируем статику - т.е. шар в руке)
+                const clickedBody = bodies.find(b => Matter.Bounds.contains(b.bounds, {x:x, y:y}) && !b.isStatic && Number.isInteger(b.label));
 
                 if(clickedBody) {
-                    Matter.World.remove(engine.world, clickedBody);
+                    const skin = SKINS_DB[currentSkin];
 
-                    // Потратили молоток
-                    hammersUsed++;
-                    isBuffActive = false;
+                    if(activeBuff === 'hammer') {
+                        // Эффект
+                        Particles.spawn(clickedBody.position.x, clickedBody.position.y, clickedBody.render.fillStyle);
+                        Matter.World.remove(engine.world, clickedBody);
+                        hammersUsed++;
+                    } 
+                    else if(activeBuff === 'bomb') {
+                        const targetType = clickedBody.label;
+                        const targets = bodies.filter(b => b.label === targetType && !b.isStatic);
 
-                    Game.exitBuffMode();
+                        targets.forEach(b => {
+                            Particles.spawn(b.position.x, b.position.y, b.render.fillStyle);
+                            Matter.World.remove(engine.world, b);
+                        });
+                        bombsUsed++;
+                    }
+
+                    Game.deactivateBuffs();
                     Game.updateUI();
                 }
                 return;
@@ -460,21 +483,60 @@
             }
         },
 
-        exitBuffMode: () => {
-            document.body.classList.remove('destroy-mode');
-            const btn = document.getElementById('buff-btn');
-            btn.classList.remove('active-mode'); 
-            document.getElementById('buff-icon').innerText = "🔨";
+        toggleBuff: (type) => {
+            if(activeBuff === type) {
+                Game.deactivateBuffs(); // Отмена
+            } else {
+                // Проверка доступности
+                const hammerCount = Math.floor(score / COST_HAMMER) - hammersUsed;
+                const bombCount = Math.floor(score / COST_BOMB) - bombsUsed;
+
+                if(type === 'hammer' && hammerCount > 0) {
+                    Game.setActiveMode('hammer');
+                } else if(type === 'bomb' && bombCount > 0) {
+                    Game.setActiveMode('bomb');
+                }
+            }
+        },
+
+        setActiveMode: (mode) => {
+            activeBuff = mode;
+            document.body.className = ''; // reset
+            document.body.classList.add('mode-active');
+
+            const btnHammer = document.getElementById('btn-hammer');
+            const btnBomb = document.getElementById('btn-bomb');
+            btnHammer.classList.remove('active-hammer');
+            btnBomb.classList.remove('active-bomb');
+
+            if(mode === 'hammer') {
+                document.body.classList.add('mode-hammer');
+                btnHammer.classList.add('active-hammer');
+            } else if(mode === 'bomb') {
+                document.body.classList.add('mode-bomb');
+                btnBomb.classList.add('active-bomb');
+            }
+        },
+
+        deactivateBuffs: () => {
+            activeBuff = null;
+            document.body.className = '';
+            document.getElementById('btn-hammer').classList.remove('active-hammer');
+            document.getElementById('btn-bomb').classList.remove('active-bomb');
         },
 
         handleCollisions: (event) => {
             const pairs = event.pairs;
             pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
-
                 if(Number.isInteger(bodyA.label) && Number.isInteger(bodyB.label)) {
                     if(bodyA.label === bodyB.label) {
                         const idx = bodyA.label;
+                        const midX = (bodyA.position.x + bodyB.position.x)/2;
+                        const midY = (bodyA.position.y + bodyB.position.y)/2;
+
+                        // Эффект слияния
+                        Particles.spawn(midX, midY, bodyA.render.fillStyle);
 
                         Matter.World.remove(engine.world, [bodyA, bodyB]);
 
@@ -483,75 +545,60 @@
                             Game.playSound('merge');
                         } else {
                             const newIdx = idx + 1;
-                            const midX = (bodyA.position.x + bodyB.position.x)/2;
-                            const midY = (bodyA.position.y + bodyB.position.y)/2;
-
                             const skin = SKINS_DB[currentSkin];
                             const level = skin.levels[newIdx];
                             const size = BALL_SIZES[newIdx];
 
                             const newBody = Matter.Bodies.circle(midX, midY, size, {
-                                label: newIdx,
-                                restitution: 0.3,
-                                render: { fillStyle: level.color }
+                                label: newIdx, restitution: 0.3, render: { fillStyle: level.color }
                             });
                             Matter.World.add(engine.world, newBody);
-
                             score += level.score;
                             Game.playSound('merge');
                         }
-
                         Game.updateUI();
                     }
                 }
             });
         },
 
-        activateBuff: (e) => {
-            // Считаем сколько всего накопили
-            const totalHammersEarned = Math.floor(score / SCORE_PER_HAMMER);
-            const hammersAvailable = totalHammersEarned - hammersUsed;
-
-            // Если включен режим - выключаем (отмена)
-            if(isBuffActive) {
-                isBuffActive = false;
-                Game.exitBuffMode();
-                return;
-            }
-
-            // Если есть доступные и режим выключен - включаем
-            if(hammersAvailable > 0) {
-                isBuffActive = true;
-                document.body.classList.add('destroy-mode');
-                const btn = document.getElementById('buff-btn');
-                btn.classList.add('active-mode'); 
-                document.getElementById('buff-icon').innerText = "❌";
-            }
-        },
-
         updateUI: () => {
             document.getElementById('score-val').innerText = score;
 
-            // ЛОГИКА НАКОПЛЕНИЯ
-            const totalHammersEarned = Math.floor(score / SCORE_PER_HAMMER);
-            const hammersAvailable = totalHammersEarned - hammersUsed;
-            const progress = score % SCORE_PER_HAMMER;
-            const percentage = (progress / SCORE_PER_HAMMER) * 100;
+            const hammerCount = Math.floor(score / COST_HAMMER) - hammersUsed;
+            const bombCount = Math.floor(score / COST_BOMB) - bombsUsed;
 
-            // Обновляем прогресс бар
-            document.getElementById('buff-progress').style.height = percentage + '%';
-
-            const btn = document.getElementById('buff-btn');
-            const badge = document.getElementById('buff-count-badge');
-
-            // Обновляем бейдж с количеством
-            if(hammersAvailable > 0) {
-                badge.innerText = hammersAvailable;
-                badge.classList.add('visible');
-                if(!isBuffActive) btn.classList.add('ready');
+            // Hammer UI
+            const hBadge = document.getElementById('badge-hammer');
+            const hBtn = document.getElementById('btn-hammer');
+            if(hammerCount > 0) {
+                hBadge.innerText = hammerCount;
+                hBadge.classList.add('visible');
+                hBtn.classList.add('ready');
+                // Прогресс бар для хаммера (радиальный градиент)
+                const hProg = (score % COST_HAMMER) / COST_HAMMER * 100;
+                hBtn.style.background = `conic-gradient(#ffcc00 ${hProg}%, #333 0)`;
             } else {
-                badge.classList.remove('visible');
-                btn.classList.remove('ready');
+                hBadge.classList.remove('visible');
+                hBtn.classList.remove('ready');
+                const hProg = (score % COST_HAMMER) / COST_HAMMER * 100;
+                hBtn.style.background = `conic-gradient(rgba(255,204,0,0.3) ${hProg}%, #333 0)`;
+            }
+
+            // Bomb UI
+            const bBadge = document.getElementById('badge-bomb');
+            const bBtn = document.getElementById('btn-bomb');
+            if(bombCount > 0) {
+                bBadge.innerText = bombCount;
+                bBadge.classList.add('visible');
+                bBtn.classList.add('ready');
+                const bProg = (score % COST_BOMB) / COST_BOMB * 100;
+                bBtn.style.background = `conic-gradient(#ff4444 ${bProg}%, #333 0)`;
+            } else {
+                bBadge.classList.remove('visible');
+                bBtn.classList.remove('ready');
+                const bProg = (score % COST_BOMB) / COST_BOMB * 100;
+                bBtn.style.background = `conic-gradient(rgba(255,68,68,0.3) ${bProg}%, #333 0)`;
             }
         },
 
@@ -570,14 +617,9 @@
                     const size = BALL_SIZES[body.label];
 
                     if(skin.type === 'image' && lvlData.file) {
-                        const img = new Image();
-                        img.src = skin.path + lvlData.file;
-                        if(img.complete) {
-                            ctx.drawImage(img, body.position.x - size, body.position.y - size, size*2, size*2);
-                        } else {
-                            ctx.font = `${size*1.2}px Arial`;
-                            ctx.fillText(lvlData.label, body.position.x, body.position.y);
-                        }
+                        const img = new Image(); img.src = skin.path + lvlData.file;
+                        if(img.complete) ctx.drawImage(img, body.position.x - size, body.position.y - size, size*2, size*2);
+                        else { ctx.font = `${size*1.2}px Arial`; ctx.fillText(lvlData.label, body.position.x, body.position.y); }
                     } else {
                         ctx.font = `${size*1.2}px Arial`;
                         ctx.fillText(lvlData.label, body.position.x, body.position.y + (size*0.1));
@@ -585,12 +627,11 @@
                 }
             });
 
+            // Dead Line
             ctx.beginPath();
-            ctx.moveTo(0, 150);
-            ctx.lineTo(W, 150);
+            ctx.moveTo(0, 150); ctx.lineTo(W, 150);
             ctx.strokeStyle = 'rgba(255,50,50,0.4)';
-            ctx.setLineDash([10, 15]);
-            ctx.stroke();
+            ctx.setLineDash([10, 15]); ctx.stroke();
 
             Game.checkGameOver(bodies);
         },
@@ -606,19 +647,15 @@
         },
 
         playSound: (type) => {
-            if(SOUNDS_CFG[type]) {
-               const audio = new Audio(SOUNDS_CFG[type]);
-               audio.play().catch(e=>{});
-            } else {
+            if(SOUNDS_CFG[type]) { new Audio(SOUNDS_CFG[type]).play().catch(e=>{}); } 
+            else {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.frequency.value = 300 + (Math.random()*200);
                 gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
             }
         }
     };
