@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meme Drop Telegram</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Arial', sans-serif;
+            touch-action: none; /* Отключаем зум и скролл браузера */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #score {
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        #game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            z-index: 20;
+            width: 80%;
+        }
+
+        button {
+            background: #0088cc;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+    <!-- Подключаем физический движок Matter.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div id="score">Очки: 0</div>
+    </div>
+
+    <div id="game-over">
+        <h1>💀 ПОТРАЧЕНО</h1>
+        <p>Твой результат: <span id="final-score">0</span></p>
+        <button onclick="location.reload()">Играть снова</button>
+    </div>
+</div>
+
+<script>
+    // --- НАСТРОЙКИ ИГРЫ ---
+    // Уровни мемов: от маленького к большому
+    // size: радиус шарика
+    // label: эмодзи (можно заменить на картинки)
+    const LEVELS = [
+        { size: 20, color: '#FFD700', label: '🤡', score: 2 },  // 0: Клоун
+        { size: 30, color: '#FFA500', label: '💩', score: 4 },  // 1: Какашка
+        { size: 40, color: '#FF4500', label: '🐹', score: 8 },  // 2: Хомяк
+        { size: 50, color: '#DC143C', label: '🪙', score: 16 }, // 3: Монета
+        { size: 60, color: '#C71585', label: '💸', score: 32 }, // 4: Деньги
+        { size: 70, color: '#8A2BE2', label: '🚙', score: 64 }, // 5: Гелик
+        { size: 80, color: '#4169E1', label: '💎', score: 128 },// 6: Алмаз
+        { size: 90, color: '#00BFFF', label: '👑', score: 256 },// 7: Корона
+        { size: 100,color: '#00FA9A', label: '🗿', score: 512 } // 8: Гигачад
+    ];
+
+    // --- ИНИЦИАЛИЗАЦИЯ ДВИЖКА ---
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          Runner = Matter.Runner,
+          Bodies = Matter.Bodies,
+          Composite = Matter.Composite,
+          Events = Matter.Events,
+          World = Matter.World;
+
+    const engine = Engine.create();
+
+    // Получаем размеры экрана
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const wallThickness = 50;
+
+    // Создаем рендерер
+    const render = Render.create({
+        element: document.getElementById('game-container'),
+        engine: engine,
+        options: {
+            width: width,
+            height: height,
+            wireframes: false, // Выключаем режим "каркаса", чтобы видеть цвета
+            background: '#1a1a1a'
+        }
+    });
+
+    // --- СТЕНЫ (ВЕДРО) ---
+    // Пол
+    const ground = Bodies.rectangle(width / 2, height + 25, width, 60, { isStatic: true, render: { fillStyle: '#333' } });
+    // Стены
+    const leftWall = Bodies.rectangle(0, height / 2, wallThickness, height, { isStatic: true, render: { fillStyle: '#333' } });
+    const rightWall = Bodies.rectangle(width, height / 2, wallThickness, height, { isStatic: true, render: { fillStyle: '#333' } });
+
+    World.add(engine.world, [ground, leftWall, rightWall]);
+
+    // Линия смерти (визуальная)
+    const dangerLineY = 150; 
+
+    // --- ЛОГИКА ИГРЫ ---
+    let score = 0;
+    let currentBall = null;
+    let canDrop = true;
+    let isGameOver = false;
+
+    const scoreEl = document.getElementById('score');
+
+    // Функция создания нового шарика для броска (появляется сверху)
+    function spawnCurrentBall() {
+        if (isGameOver) return;
+
+        // Всегда спавним только первые 3 уровня (чтобы было честно)
+        const levelIdx = Math.floor(Math.random() * 3); 
+        const level = LEVELS[levelIdx];
+
+        currentBall = Bodies.circle(width / 2, 80, level.size, {
+            isStatic: true, // Пока не бросили - он висит
+            label: levelIdx, // Запоминаем уровень в метку
+            render: { fillStyle: level.color }
+        });
+
+        World.add(engine.world, currentBall);
+    }
+
+    // Обработка нажатия (Бросок)
+    function handleInput(e) {
+        if (!canDrop || isGameOver || !currentBall) return;
+
+        let clientX;
+        if(e.type === 'touchstart') {
+            clientX = e.touches[0].clientX;
+        } else {
+            clientX = e.clientX;
+        }
+
+        // Ограничиваем позицию стенами
+        const x = Math.max(wallThickness + 20, Math.min(clientX, width - wallThickness - 20));
+
+        // Перемещаем шарик в точку клика
+        Matter.Body.setPosition(currentBall, { x: x, y: 80 });
+
+        // Включаем физику (бросаем)
+        Matter.Body.setStatic(currentBall, false);
+        currentBall.restitution = 0.3; // Упругость
+
+        canDrop = false;
+        currentBall = null;
+
+        // Таймер до появления следующего шарика
+        setTimeout(() => {
+            canDrop = true;
+            spawnCurrentBall();
+        }, 800);
+    }
+
+    // Слушатели нажатий
+    window.addEventListener('mousedown', handleInput);
+    window.addEventListener('touchstart', handleInput);
+
+    // Движение шарика за пальцем/мышкой (до броска)
+    window.addEventListener('mousemove', (e) => {
+        if(canDrop && currentBall) {
+            const x = Math.max(wallThickness + 20, Math.min(e.clientX, width - wallThickness - 20));
+            Matter.Body.setPosition(currentBall, { x: x, y: 80 });
+        }
+    });
+    window.addEventListener('touchmove', (e) => {
+        if(canDrop && currentBall) {
+            const x = Math.max(wallThickness + 20, Math.min(e.touches[0].clientX, width - wallThickness - 20));
+            Matter.Body.setPosition(currentBall, { x: x, y: 80 });
+        }
+    });
+
+    // --- ЛОГИКА СЛИЯНИЯ (MERGE) ---
+    Events.on(engine, 'collisionStart', (event) => {
+        const pairs = event.pairs;
+
+        pairs.forEach((pair) => {
+            const bodyA = pair.bodyA;
+            const bodyB = pair.bodyB;
+
+            // Проверяем, что это шарики и у них одинаковый уровень
+            // Мы используем label как индекс уровня
+            // (Нужно убедиться, что label - это число)
+            if (Number.isInteger(bodyA.label) && bodyA.label === bodyB.label) {
+                const levelIdx = bodyA.label;
+
+                // Если это не последний уровень
+                if (levelIdx < LEVELS.length - 1) {
+                    const newLevelIdx = levelIdx + 1;
+                    const newLevel = LEVELS[newLevelIdx];
+
+                    // Координаты для нового шарика (посередине между двумя старыми)
+                    const midX = (bodyA.position.x + bodyB.position.x) / 2;
+                    const midY = (bodyA.position.y + bodyB.position.y) / 2;
+
+                    // Удаляем старые
+                    World.remove(engine.world, [bodyA, bodyB]);
+
+                    // Создаем новый, более крупный
+                    const newBody = Bodies.circle(midX, midY, newLevel.size, {
+                        label: newLevelIdx,
+                        render: { fillStyle: newLevel.color },
+                        restitution: 0.3
+                    });
+
+                    World.add(engine.world, newBody);
+
+                    // Обновляем очки
+                    score += newLevel.score;
+                    scoreEl.innerText = 'Очки: ' + score;
+                }
+            }
+        });
+    });
+
+    // --- ОТРИСОВКА ЭМОДЗИ (ХУК) ---
+    // Matter.js рисует круги, а мы поверх них рисуем текст (эмодзи)
+    Events.on(render, 'afterRender', function() {
+        const context = render.context;
+        const bodies = Composite.allBodies(engine.world);
+
+        context.font = "30px Arial";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+
+        // Рисуем линию смерти
+        context.beginPath();
+        context.moveTo(0, dangerLineY);
+        context.lineTo(width, dangerLineY);
+        context.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+        context.setLineDash([10, 10]);
+        context.stroke();
+
+        bodies.forEach(body => {
+            if (Number.isInteger(body.label)) {
+                const level = LEVELS[body.label];
+                // Масштабируем эмодзи под размер шарика
+                const fontSize = level.size * 1.2; 
+                context.font = `${fontSize}px Arial`;
+                context.fillText(level.label, body.position.x, body.position.y + (level.size * 0.15));
+            }
+        });
+    });
+
+    // --- ПРОВЕРКА ПРОИГРЫША ---
+    // Проверяем каждые полсекунды, не вылез ли кто за линию
+    setInterval(() => {
+        if(isGameOver) return;
+
+        const bodies = Composite.allBodies(engine.world);
+        for(let body of bodies) {
+            // Игнорируем тот шар, который мы сейчас держим (isStatic)
+            if(!body.isStatic && body.position.y < dangerLineY) {
+                // Если шар успокоился (почти не движется) и он выше линии
+                if(body.velocity.y < 0.2 && body.velocity.y > -0.2) {
+                    triggerGameOver();
+                    break;
+                }
+            }
+        }
+    }, 1000);
+
+    function triggerGameOver() {
+        isGameOver = true;
+        document.getElementById('game-over').style.display = 'block';
+        document.getElementById('final-score').innerText = score;
+        Runner.stop(runner); // Остановить физику
+    }
+
+    // Запуск
+    spawnCurrentBall();
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+    Render.run(render);
+
+</script>
+</body>
+</html>
