@@ -3,320 +3,538 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Meme Drop Telegram</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #1a1a1a;
-            font-family: 'Arial', sans-serif;
-            touch-action: none; /* Отключаем зум и скролл браузера */
-        }
-
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #ui-layer {
-            position: absolute;
-            top: 10px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        #score {
-            font-size: 24px;
-            color: white;
-            font-weight: bold;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        #game-over {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            color: white;
-            z-index: 20;
-            width: 80%;
-        }
-
-        button {
-            background: #0088cc;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-    </style>
-    <!-- Подключаем физический движок Matter.js -->
+    <title>Merge Game 2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        /* --- СТИЛИ ИНТЕРФЕЙСА --- */
+        body { margin: 0; padding: 0; overflow: hidden; background: #121212; font-family: 'Segoe UI', sans-serif; touch-action: none; color: white; }
+        #game-container { position: relative; width: 100vw; height: 100vh; }
+
+        /* СЛОИ */
+        .layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .interactive { pointer-events: auto; }
+
+        /* HUD (Счет и Баффы) */
+        #hud { display: flex; justify-content: space-between; padding: 20px; box-sizing: border-box; z-index: 5; }
+        .score-box { font-size: 24px; font-weight: bold; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .next-ball { width: 40px; height: 40px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); }
+
+        /* Кнопка БАФФА */
+        #buff-btn {
+            background: #444; color: #888; border: 2px solid #555;
+            padding: 10px 20px; border-radius: 20px; font-weight: bold;
+            transition: 0.3s; pointer-events: auto; display: flex; align-items: center; gap: 10px;
+        }
+        #buff-btn.active {
+            background: linear-gradient(45deg, #ff0055, #ffcc00);
+            color: white; border: 2px solid #fff;
+            box-shadow: 0 0 15px #ff0055; animation: pulse 1.5s infinite; cursor: pointer;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* МЕНЮ */
+        .menu-overlay {
+            background: rgba(0,0,0,0.95); z-index: 20; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; backdrop-filter: blur(5px);
+        }
+        .hidden { display: none !important; }
+
+        h1 { margin-bottom: 30px; font-size: 40px; background: -webkit-linear-gradient(#eee, #333); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .menu-btn {
+            background: #333; color: white; border: 1px solid #555;
+            width: 200px; padding: 15px; margin: 10px; border-radius: 12px;
+            font-size: 18px; cursor: pointer; transition: 0.2s;
+        }
+        .menu-btn:active { transform: scale(0.95); }
+        .btn-primary { background: #0088cc; border: none; font-weight: bold; }
+
+        /* СПИСКИ (Скины, Лидерборд) */
+        .scroll-list {
+            width: 80%; max-height: 50%; overflow-y: auto;
+            background: #222; border-radius: 10px; padding: 10px; margin-bottom: 20px;
+        }
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px; border-bottom: 1px solid #333; cursor: pointer;
+        }
+        .list-item.selected { background: #004466; }
+        .rank { font-weight: bold; color: #ffcc00; margin-right: 10px; }
+
+        /* Эффект курсора для баффа */
+        .destroy-cursor { cursor: crosshair !important; }
+    </style>
 </head>
 <body>
 
 <div id="game-container">
-    <div id="ui-layer">
-        <div id="score">Очки: 0</div>
+    <!-- ГЛАВНОЕ МЕНЮ -->
+    <div id="main-menu" class="layer interactive menu-overlay">
+        <h1>MEME DROP</h1>
+        <button class="menu-btn btn-primary" onclick="Game.start()">ИГРАТЬ</button>
+        <button class="menu-btn" onclick="Menu.showSkins()">СКИНЫ</button>
+        <button class="menu-btn" onclick="Menu.showLeaderboard()">РЕКОРДЫ</button>
+        <button class="menu-btn" onclick="Menu.showSettings()">НАСТРОЙКИ</button>
     </div>
 
-    <div id="game-over">
-        <h1>💀 ПОТРАЧЕНО</h1>
-        <p>Твой результат: <span id="final-score">0</span></p>
-        <button onclick="location.reload()">Играть снова</button>
+    <!-- МЕНЮ СКИНОВ -->
+    <div id="skins-menu" class="layer interactive menu-overlay hidden">
+        <h2>ВЫБОР СКИНА</h2>
+        <div class="scroll-list" id="skins-list"></div>
+        <button class="menu-btn" onclick="Menu.backToMain()">НАЗАД</button>
+    </div>
+
+    <!-- ТАБЛИЦА ЛИДЕРОВ -->
+    <div id="leaderboard-menu" class="layer interactive menu-overlay hidden">
+        <h2>ТОП ИГРОКОВ</h2>
+        <div class="scroll-list" id="leaderboard-list"></div>
+        <button class="menu-btn" onclick="Menu.backToMain()">НАЗАД</button>
+    </div>
+
+    <!-- МЕНЮ GAME OVER -->
+    <div id="game-over-menu" class="layer interactive menu-overlay hidden">
+        <h1 style="-webkit-text-fill-color: red;">GAME OVER</h1>
+        <p>Счет: <span id="final-score">0</span></p>
+        <button class="menu-btn btn-primary" onclick="location.reload()">ЗАНОВО</button>
+        <button class="menu-btn" onclick="Menu.backToMain()">МЕНЮ</button>
+    </div>
+
+    <!-- HUD ИГРЫ -->
+    <div id="hud" class="layer hidden">
+        <div>
+            <div class="score-box">🏆 <span id="score-val">0</span></div>
+            <div style="font-size:12px; color:#aaa">След: <span id="next-ball-preview"></span></div>
+        </div>
+
+        <button id="buff-btn" onclick="Game.activateBuff()">
+            🔨 УНИЧТОЖИТЬ
+            <div style="font-size:10px; opacity:0.7">(2500 очков)</div>
+        </button>
     </div>
 </div>
 
 <script>
-    // --- НАСТРОЙКИ ИГРЫ ---
-    // Уровни мемов: от маленького к большому
-    // size: радиус шарика
-    // label: эмодзи (можно заменить на картинки)
-    const LEVELS = [
-        { size: 20, color: '#FFD700', label: '🤡', score: 2 },  // 0: Клоун
-        { size: 30, color: '#FFA500', label: '💩', score: 4 },  // 1: Какашка
-        { size: 40, color: '#FF4500', label: '🐹', score: 8 },  // 2: Хомяк
-        { size: 50, color: '#DC143C', label: '🪙', score: 16 }, // 3: Монета
-        { size: 60, color: '#C71585', label: '💸', score: 32 }, // 4: Деньги
-        { size: 70, color: '#8A2BE2', label: '🚙', score: 64 }, // 5: Гелик
-        { size: 80, color: '#4169E1', label: '💎', score: 128 },// 6: Алмаз
-        { size: 90, color: '#00BFFF', label: '👑', score: 256 },// 7: Корона
-        { size: 100,color: '#00FA9A', label: '🗿', score: 512 } // 8: Гигачад
-    ];
+    /* ==========================================
+       КОНФИГУРАЦИЯ (Настрой под себя здесь)
+       ========================================== */
 
-    // --- ИНИЦИАЛИЗАЦИЯ ДВИЖКА ---
-    const Engine = Matter.Engine,
-          Render = Matter.Render,
-          Runner = Matter.Runner,
-          Bodies = Matter.Bodies,
-          Composite = Matter.Composite,
-          Events = Matter.Events,
-          World = Matter.World;
+    // Сюда вставлять ссылки на звуки
+    const SOUNDS_CFG = {
+        merge: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.m3u8', // Пример звука
+        drop: null,
+        gameover: null
+    };
 
-    const engine = Engine.create();
-
-    // Получаем размеры экрана
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const wallThickness = 50;
-
-    // Создаем рендерер
-    const render = Render.create({
-        element: document.getElementById('game-container'),
-        engine: engine,
-        options: {
-            width: width,
-            height: height,
-            wireframes: false, // Выключаем режим "каркаса", чтобы видеть цвета
-            background: '#1a1a1a'
+    // Скины. type: 'emoji' или 'image'.
+    // Если image, нужно указать путь к папке (path) и названия файлов.
+    const SKINS_DB = {
+        'memes': {
+            name: 'Мемы (Default)',
+            type: 'emoji',
+            levels: [
+                { color: '#FFD700', label: '🤡', score: 2 },
+                { color: '#FFA500', label: '💩', score: 4 },
+                { color: '#FF4500', label: '🐹', score: 8 },
+                { color: '#DC143C', label: '🪙', score: 16 },
+                { color: '#C71585', label: '💸', score: 32 },
+                { color: '#8A2BE2', label: '🚙', score: 64 },
+                { color: '#4169E1', label: '💎', score: 128 },
+                { color: '#00BFFF', label: '👑', score: 256 },
+                { color: '#00FA9A', label: '🗿', score: 512 }
+            ]
+        },
+        'fruits': {
+            name: 'Фрукты (Пример)',
+            type: 'emoji', // Поменяй на 'image', если добавишь картинки
+            path: 'assets/fruits/', 
+            levels: [
+                { color: '#F00', label: '🍒', file: '1.png', score: 2 },
+                { color: '#F00', label: '🍓', file: '2.png', score: 4 },
+                { color: '#800080', label: '🍇', file: '3.png', score: 8 },
+                { color: '#FFA500', label: '🍊', file: '4.png', score: 16 },
+                { color: '#FFA500', label: '🥭', file: '5.png', score: 32 },
+                { color: '#FF0000', label: '🍎', file: '6.png', score: 64 },
+                { color: '#FFFF00', label: '🍐', file: '7.png', score: 128 },
+                { color: '#FFC0CB', label: '🍑', file: '8.png', score: 256 },
+                { color: '#008000', label: '🍉', file: '9.png', score: 512 }
+            ]
         }
-    });
+    };
 
-    // --- СТЕНЫ (ВЕДРО) ---
-    // Пол
-    const ground = Bodies.rectangle(width / 2, height + 25, width, 60, { isStatic: true, render: { fillStyle: '#333' } });
-    // Стены
-    const leftWall = Bodies.rectangle(0, height / 2, wallThickness, height, { isStatic: true, render: { fillStyle: '#333' } });
-    const rightWall = Bodies.rectangle(width, height / 2, wallThickness, height, { isStatic: true, render: { fillStyle: '#333' } });
+    /* ==========================================
+       ДВИЖОК И ЛОГИКА
+       ========================================== */
 
-    World.add(engine.world, [ground, leftWall, rightWall]);
-
-    // Линия смерти (визуальная)
-    const dangerLineY = 150; 
-
-    // --- ЛОГИКА ИГРЫ ---
+    // Глобальные переменные
+    let currentSkin = 'memes';
+    let engine, render, runner;
     let score = 0;
+    let lastBuffScore = 0;
+    let isBuffActive = false;
+    let gameActive = false;
     let currentBall = null;
     let canDrop = true;
-    let isGameOver = false;
+    let nextBallIndex = 0; // Какой шар следующий
 
-    const scoreEl = document.getElementById('score');
+    // Размеры (динамические)
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const BALL_SIZES = [20, 30, 40, 50, 60, 70, 80, 90, 100]; // Радиусы для 9 уровней
 
-    // Функция создания нового шарика для броска (появляется сверху)
-    function spawnCurrentBall() {
-        if (isGameOver) return;
+    // Аудио контекст
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // Всегда спавним только первые 3 уровня (чтобы было честно)
-        const levelIdx = Math.floor(Math.random() * 3); 
-        const level = LEVELS[levelIdx];
+    // --- МЕНЕДЖЕР МЕНЮ ---
+    const Menu = {
+        hideAll: () => {
+            document.querySelectorAll('.menu-overlay').forEach(el => el.classList.add('hidden'));
+        },
+        backToMain: () => {
+            Menu.hideAll();
+            document.getElementById('main-menu').classList.remove('hidden');
+        },
+        showSkins: () => {
+            Menu.hideAll();
+            document.getElementById('skins-menu').classList.remove('hidden');
+            const list = document.getElementById('skins-list');
+            list.innerHTML = '';
+            for (let key in SKINS_DB) {
+                const skin = SKINS_DB[key];
+                const div = document.createElement('div');
+                div.className = `list-item ${currentSkin === key ? 'selected' : ''}`;
+                div.innerHTML = `<span>${skin.name}</span> <span>${skin.levels[0].label}</span>`;
+                div.onclick = () => {
+                    currentSkin = key;
+                    localStorage.setItem('selectedSkin', key);
+                    Menu.showSkins(); // Перерисовать
+                };
+                list.appendChild(div);
+            }
+        },
+        showLeaderboard: () => {
+            Menu.hideAll();
+            document.getElementById('leaderboard-menu').classList.remove('hidden');
+            const list = document.getElementById('leaderboard-list');
+            // Получаем рекорды из LocalStorage (в реале тут запрос к серверу)
+            let records = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            records.sort((a,b) => b.score - a.score);
 
-        currentBall = Bodies.circle(width / 2, 80, level.size, {
-            isStatic: true, // Пока не бросили - он висит
-            label: levelIdx, // Запоминаем уровень в метку
-            render: { fillStyle: level.color }
-        });
+            list.innerHTML = '';
+            if(records.length === 0) list.innerHTML = '<div style="padding:10px;text-align:center">Нет записей</div>';
 
-        World.add(engine.world, currentBall);
-    }
+            records.slice(0, 10).forEach((rec, i) => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<div><span class="rank">#${i+1}</span> ${rec.name}</div> <div>${rec.score}</div>`;
+                list.appendChild(div);
+            });
+        },
+        showSettings: () => {
+            alert('Здесь можно добавить громкость звука и вибрацию.');
+        },
+        showGameOver: () => {
+            gameActive = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-menu').classList.remove('hidden');
 
-    // Обработка нажатия (Бросок)
-    function handleInput(e) {
-        if (!canDrop || isGameOver || !currentBall) return;
-
-        let clientX;
-        if(e.type === 'touchstart') {
-            clientX = e.touches[0].clientX;
-        } else {
-            clientX = e.clientX;
+            // Сохраняем рекорд
+            let records = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            // Тут можно интегрировать Telegram Username
+            let name = "Игрок"; 
+            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe.user) {
+                name = window.Telegram.WebApp.initDataUnsafe.user.first_name;
+            }
+            records.push({name: name, score: score, date: new Date()});
+            localStorage.setItem('leaderboard', JSON.stringify(records));
         }
+    };
 
-        // Ограничиваем позицию стенами
-        const x = Math.max(wallThickness + 20, Math.min(clientX, width - wallThickness - 20));
+    // --- ЛОГИКА ИГРЫ ---
+    const Game = {
+        start: () => {
+            Menu.hideAll();
+            document.getElementById('hud').classList.remove('hidden');
 
-        // Перемещаем шарик в точку клика
-        Matter.Body.setPosition(currentBall, { x: x, y: 80 });
+            // Загрузка скина
+            const savedSkin = localStorage.getItem('selectedSkin');
+            if(savedSkin && SKINS_DB[savedSkin]) currentSkin = savedSkin;
 
-        // Включаем физику (бросаем)
-        Matter.Body.setStatic(currentBall, false);
-        currentBall.restitution = 0.3; // Упругость
+            Game.initPhysics();
+            score = 0;
+            lastBuffScore = 0;
+            Game.updateUI();
+            gameActive = true;
+            Game.spawnNext();
+        },
 
-        canDrop = false;
-        currentBall = null;
-
-        // Таймер до появления следующего шарика
-        setTimeout(() => {
-            canDrop = true;
-            spawnCurrentBall();
-        }, 800);
-    }
-
-    // Слушатели нажатий
-    window.addEventListener('mousedown', handleInput);
-    window.addEventListener('touchstart', handleInput);
-
-    // Движение шарика за пальцем/мышкой (до броска)
-    window.addEventListener('mousemove', (e) => {
-        if(canDrop && currentBall) {
-            const x = Math.max(wallThickness + 20, Math.min(e.clientX, width - wallThickness - 20));
-            Matter.Body.setPosition(currentBall, { x: x, y: 80 });
-        }
-    });
-    window.addEventListener('touchmove', (e) => {
-        if(canDrop && currentBall) {
-            const x = Math.max(wallThickness + 20, Math.min(e.touches[0].clientX, width - wallThickness - 20));
-            Matter.Body.setPosition(currentBall, { x: x, y: 80 });
-        }
-    });
-
-    // --- ЛОГИКА СЛИЯНИЯ (MERGE) ---
-    Events.on(engine, 'collisionStart', (event) => {
-        const pairs = event.pairs;
-
-        pairs.forEach((pair) => {
-            const bodyA = pair.bodyA;
-            const bodyB = pair.bodyB;
-
-            // Проверяем, что это шарики и у них одинаковый уровень
-            // Мы используем label как индекс уровня
-            // (Нужно убедиться, что label - это число)
-            if (Number.isInteger(bodyA.label) && bodyA.label === bodyB.label) {
-                const levelIdx = bodyA.label;
-
-                // Если это не последний уровень
-                if (levelIdx < LEVELS.length - 1) {
-                    const newLevelIdx = levelIdx + 1;
-                    const newLevel = LEVELS[newLevelIdx];
-
-                    // Координаты для нового шарика (посередине между двумя старыми)
-                    const midX = (bodyA.position.x + bodyB.position.x) / 2;
-                    const midY = (bodyA.position.y + bodyB.position.y) / 2;
-
-                    // Удаляем старые
-                    World.remove(engine.world, [bodyA, bodyB]);
-
-                    // Создаем новый, более крупный
-                    const newBody = Bodies.circle(midX, midY, newLevel.size, {
-                        label: newLevelIdx,
-                        render: { fillStyle: newLevel.color },
-                        restitution: 0.3
-                    });
-
-                    World.add(engine.world, newBody);
-
-                    // Обновляем очки
-                    score += newLevel.score;
-                    scoreEl.innerText = 'Очки: ' + score;
+        initPhysics: () => {
+            if(engine) { // Очистка если рестарт
+                Matter.World.clear(engine.world);
+                Matter.Engine.clear(engine);
+                if(render) {
+                    render.canvas.remove();
+                    render.canvas = null;
+                    render.context = null;
+                    render.textures = {};
                 }
+                if(runner) Matter.Runner.stop(runner);
             }
-        });
-    });
 
-    // --- ОТРИСОВКА ЭМОДЗИ (ХУК) ---
-    // Matter.js рисует круги, а мы поверх них рисуем текст (эмодзи)
-    Events.on(render, 'afterRender', function() {
-        const context = render.context;
-        const bodies = Composite.allBodies(engine.world);
+            const Engine = Matter.Engine,
+                  Render = Matter.Render,
+                  Runner = Matter.Runner,
+                  Bodies = Matter.Bodies,
+                  World = Matter.World,
+                  Events = Matter.Events;
 
-        context.font = "30px Arial";
-        context.textAlign = "center";
-        context.textBaseline = "middle";
+            engine = Engine.create();
 
-        // Рисуем линию смерти
-        context.beginPath();
-        context.moveTo(0, dangerLineY);
-        context.lineTo(width, dangerLineY);
-        context.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-        context.setLineDash([10, 10]);
-        context.stroke();
+            // Рендер
+            render = Render.create({
+                element: document.getElementById('game-container'),
+                engine: engine,
+                options: {
+                    width: W, height: H,
+                    wireframes: false, background: 'transparent' // Прозрачный, т.к. фон в CSS
+                }
+            });
 
-        bodies.forEach(body => {
-            if (Number.isInteger(body.label)) {
-                const level = LEVELS[body.label];
-                // Масштабируем эмодзи под размер шарика
-                const fontSize = level.size * 1.2; 
-                context.font = `${fontSize}px Arial`;
-                context.fillText(level.label, body.position.x, body.position.y + (level.size * 0.15));
+            // Стены
+            const wallOpts = { isStatic: true, render: { fillStyle: '#333' } };
+            const ground = Bodies.rectangle(W/2, H+30, W, 60, wallOpts);
+            const leftW = Bodies.rectangle(0, H/2, 20, H, wallOpts);
+            const rightW = Bodies.rectangle(W, H/2, 20, H, wallOpts);
+            World.add(engine.world, [ground, leftW, rightW]);
+
+            // Хук для отрисовки Эмодзи/Картинок
+            Events.on(render, 'afterRender', Game.renderCustomSkins);
+
+            // Хук коллизий (Слияние)
+            Events.on(engine, 'collisionStart', Game.handleCollisions);
+
+            runner = Runner.create();
+            Runner.run(runner, engine);
+            Render.run(render);
+
+            // Ввод (Мышь/Тач)
+            window.addEventListener('mousedown', Game.handleInput);
+            window.addEventListener('touchstart', Game.handleInput);
+            window.addEventListener('mousemove', Game.moveBall);
+            window.addEventListener('touchmove', Game.moveBall);
+        },
+
+        spawnNext: () => {
+            if(!gameActive) return;
+            // Генерируем новый шар
+            nextBallIndex = Math.floor(Math.random() * 3); // Только мелкие
+            const size = BALL_SIZES[nextBallIndex];
+            const skinData = SKINS_DB[currentSkin];
+            const levelData = skinData.levels[nextBallIndex];
+
+            // Показываем в превью
+            document.getElementById('next-ball-preview').innerText = levelData.label;
+
+            // Создаем физическое тело (но пока статичное)
+            currentBall = Matter.Bodies.circle(W/2, 60, size, {
+                isStatic: true,
+                label: nextBallIndex,
+                render: { fillStyle: levelData.color }
+            });
+            Matter.World.add(engine.world, currentBall);
+            canDrop = true;
+        },
+
+        moveBall: (e) => {
+            if(canDrop && currentBall && !isBuffActive) {
+                let x = (e.touches ? e.touches[0].clientX : e.clientX);
+                x = Math.max(30, Math.min(x, W - 30));
+                Matter.Body.setPosition(currentBall, { x: x, y: 60 });
             }
-        });
-    });
+        },
 
-    // --- ПРОВЕРКА ПРОИГРЫША ---
-    // Проверяем каждые полсекунды, не вылез ли кто за линию
-    setInterval(() => {
-        if(isGameOver) return;
+        handleInput: (e) => {
+            if(!gameActive) return;
 
-        const bodies = Composite.allBodies(engine.world);
-        for(let body of bodies) {
-            // Игнорируем тот шар, который мы сейчас держим (isStatic)
-            if(!body.isStatic && body.position.y < dangerLineY) {
-                // Если шар успокоился (почти не движется) и он выше линии
-                if(body.velocity.y < 0.2 && body.velocity.y > -0.2) {
-                    triggerGameOver();
+            // РЕЖИМ БАФФА (Уничтожение)
+            if(isBuffActive) {
+                const x = (e.touches ? e.touches[0].clientX : e.clientX);
+                const y = (e.touches ? e.touches[0].clientY : e.clientY);
+
+                // Ищем тело под курсором
+                const bodies = Matter.Composite.allBodies(engine.world);
+                const clickedBody = bodies.find(b => Matter.Bounds.contains(b.bounds, {x:x, y:y}) && !b.isStatic);
+
+                if(clickedBody) {
+                    Game.createExplosionEffect(clickedBody.position.x, clickedBody.position.y);
+                    Matter.World.remove(engine.world, clickedBody);
+                    isBuffActive = false;
+                    document.getElementById('buff-btn').classList.remove('active');
+                    document.body.classList.remove('destroy-cursor');
+                    document.getElementById('buff-btn').innerText = `🔨 УНИЧТОЖИТЬ`;
+                }
+                return;
+            }
+
+            // РЕЖИМ СБРОСА
+            if(canDrop && currentBall) {
+                let x = (e.touches ? e.touches[0].clientX : e.clientX);
+                x = Math.max(30, Math.min(x, W - 30));
+                Matter.Body.setPosition(currentBall, { x: x, y: 60 });
+                Matter.Body.setStatic(currentBall, false);
+                currentBall.restitution = 0.4;
+                canDrop = false;
+                currentBall = null;
+                setTimeout(Game.spawnNext, 800);
+            }
+        },
+
+        handleCollisions: (event) => {
+            const pairs = event.pairs;
+            pairs.forEach(pair => {
+                const { bodyA, bodyB } = pair;
+                if(bodyA.label === bodyB.label && Number.isInteger(bodyA.label)) {
+                    const idx = bodyA.label;
+                    if(idx < BALL_SIZES.length - 1) {
+                        const newIdx = idx + 1;
+                        const midX = (bodyA.position.x + bodyB.position.x)/2;
+                        const midY = (bodyA.position.y + bodyB.position.y)/2;
+
+                        // Удаляем старые
+                        Matter.World.remove(engine.world, [bodyA, bodyB]);
+
+                        // Создаем новый
+                        const skin = SKINS_DB[currentSkin];
+                        const level = skin.levels[newIdx];
+                        const size = BALL_SIZES[newIdx];
+
+                        const newBody = Matter.Bodies.circle(midX, midY, size, {
+                            label: newIdx,
+                            restitution: 0.3,
+                            render: { fillStyle: level.color }
+                        });
+                        Matter.World.add(engine.world, newBody);
+
+                        // Эффекты
+                        score += level.score;
+                        Game.updateUI();
+                        Game.playSound('merge');
+                    }
+                }
+            });
+        },
+
+        activateBuff: () => {
+            if(score - lastBuffScore >= 2500 && !isBuffActive) {
+                isBuffActive = true;
+                lastBuffScore = score; // Сбрасываем счетчик баффа (но не общий счет)
+                document.body.classList.add('destroy-cursor');
+                document.getElementById('buff-btn').classList.remove('active');
+                document.getElementById('buff-btn').innerText = "❌ ВЫБЕРИ ЦЕЛЬ";
+            }
+        },
+
+        updateUI: () => {
+            document.getElementById('score-val').innerText = score;
+
+            const btn = document.getElementById('buff-btn');
+            const progress = score - lastBuffScore;
+
+            if(progress >= 2500) {
+                if(!btn.classList.contains('active') && !isBuffActive) {
+                    btn.classList.add('active');
+                    btn.innerText = "🔥 ГОТОВО (ЖМИ)";
+                }
+            } else {
+                btn.innerText = `🔨 ${progress}/2500`;
+            }
+        },
+
+        renderCustomSkins: () => {
+            const ctx = render.context;
+            const bodies = Matter.Composite.allBodies(engine.world);
+            const skin = SKINS_DB[currentSkin];
+
+            ctx.font = "bold 20px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            bodies.forEach(body => {
+                if(Number.isInteger(body.label)) {
+                    const lvlData = skin.levels[body.label];
+                    const size = BALL_SIZES[body.label];
+
+                    if(skin.type === 'image' && lvlData.file) {
+                        // Отрисовка КАРТИНКИ
+                        // В реальном проекте картинки надо предзагрузить. 
+                        // Здесь упрощенная логика:
+                        const img = new Image();
+                        img.src = skin.path + lvlData.file;
+                        // Примечание: Это плохой способ (создавать Image в render loop).
+                        // Но для примера сойдет. В проде нужно кэширование.
+                        if(img.complete) {
+                            ctx.drawImage(img, body.position.x - size, body.position.y - size, size*2, size*2);
+                        } else {
+                            // Пока не загрузилась - рисуем эмодзи
+                            ctx.font = `${size*1.2}px Arial`;
+                            ctx.fillText(lvlData.label, body.position.x, body.position.y);
+                        }
+                    } else {
+                        // Отрисовка ЭМОДЗИ
+                        ctx.font = `${size*1.2}px Arial`;
+                        ctx.fillText(lvlData.label, body.position.x, body.position.y + (size*0.1));
+                    }
+                }
+            });
+
+            // Линия смерти
+            ctx.beginPath();
+            ctx.moveTo(0, 150);
+            ctx.lineTo(W, 150);
+            ctx.strokeStyle = 'rgba(255,50,50,0.4)';
+            ctx.setLineDash([10, 15]);
+            ctx.stroke();
+
+            // Проверка проигрыша
+            Game.checkGameOver(bodies);
+        },
+
+        checkGameOver: (bodies) => {
+            if(!gameActive) return;
+            for(let b of bodies) {
+                if(!b.isStatic && b.position.y < 150 && Math.abs(b.velocity.y) < 0.1) {
+                    Menu.showGameOver();
                     break;
                 }
             }
+        },
+
+        playSound: (type) => {
+            // Простейшая генерация звука (писк), если нет файла
+            if(SOUNDS_CFG[type]) {
+               const audio = new Audio(SOUNDS_CFG[type]);
+               audio.play().catch(e=>{});
+            } else {
+                // Синтезируем звук, чтобы было слышно хоть что-то
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = 300 + (Math.random()*200);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            }
+        },
+
+        createExplosionEffect: (x, y) => {
+            // Тут можно добавить частицы
+            console.log("BOOM at", x, y);
         }
-    }, 1000);
+    };
 
-    function triggerGameOver() {
-        isGameOver = true;
-        document.getElementById('game-over').style.display = 'block';
-        document.getElementById('final-score').innerText = score;
-        Runner.stop(runner); // Остановить физику
-    }
-
-    // Запуск
-    spawnCurrentBall();
-    const runner = Runner.create();
-    Runner.run(runner, engine);
-    Render.run(render);
-
+    // Предотвращаем скролл
+    document.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 </script>
 </body>
 </html>
