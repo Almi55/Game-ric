@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Merge Game 2.3</title>
+    <title>Merge Game 2.4</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
         /* --- СТИЛИ ИНТЕРФЕЙСА --- */
@@ -67,24 +67,42 @@
             cursor: pointer;
             position: relative;
             transition: transform 0.1s;
-            overflow: hidden;
+            overflow: visible; /* Чтобы значок кол-ва не обрезался */
             user-select: none;
         }
 
+        /* Счетчик зарядов */
+        #buff-count-badge {
+            position: absolute;
+            top: -5px; right: -5px;
+            background: red; color: white;
+            font-size: 12px; font-weight: bold;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid #121212;
+            z-index: 10;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        #buff-count-badge.visible { opacity: 1; }
+
+        /* Прогресс бар */
         #buff-progress {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
             background: rgba(255, 204, 0, 0.6);
-            transition: height 0.5s;
-            z-index: 1;
+            transition: height 0.3s;
+            z-index: 1; border-radius: 0 0 50px 50px;
         }
         #buff-icon { z-index: 2; position: relative; }
 
         #buff-btn.ready {
-            background: #ffcc00; border-color: #fff; color: #000;
-            box-shadow: 0 0 15px #ffcc00;
-            animation: pulse 1.5s infinite;
+            background: #444; border-color: #ffcc00; color: #fff;
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.3);
         }
-        #buff-btn:active { transform: scale(0.9); }
+        #buff-btn.active-mode {
+            background: #ffcc00; color: #000;
+            animation: pulse 1.0s infinite;
+        }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
@@ -116,6 +134,7 @@
         }
         .list-item.selected { background: #004466; }
 
+        /* Режим уничтожения */
         .destroy-mode { cursor: crosshair !important; }
         .destroy-mode #game-container { border: 4px solid red; box-sizing: border-box; }
     </style>
@@ -169,6 +188,7 @@
             <div id="buff-btn" onclick="Game.activateBuff()" ontouchstart="event.stopPropagation()">
                 <div id="buff-progress"></div>
                 <span id="buff-icon">🔨</span>
+                <div id="buff-count-badge">1</div>
             </div>
             <div style="font-size:10px; margin-top:5px; opacity:0.7">2500 pts</div>
         </div>
@@ -222,22 +242,25 @@
     let engine, render, runner;
     let ground, leftW, rightW;
     let score = 0;
-    let lastBuffScore = 0;
+
+    // БАФФЫ (НАКОПИТЕЛЬНАЯ СИСТЕМА)
+    let hammersUsed = 0; // Сколько молотков мы потратили
+    const SCORE_PER_HAMMER = 2500;
+
     let isBuffActive = false;
     let gameActive = false;
     let currentBall = null;
     let canDrop = true;
-
-    // ЛОГИКА "NEXT"
-    // Мы храним индекс шара, который будет СЛЕДУЮЩИМ (показан в углу)
     let upcomingBallIndex = 0; 
 
     let W = window.innerWidth;
     let H = window.innerHeight;
-    const BALL_SIZES = [20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+    // РАЗМЕРЫ (-10% от версии 2.3)
+    const BALL_SIZES = [18, 27, 36, 45, 54, 63, 72, 81, 90];
+
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-    // Блокировка нажатий
     function stopPropagation(e) { e.stopPropagation(); }
     document.getElementById('hud').addEventListener('mousedown', stopPropagation);
     document.getElementById('hud').addEventListener('touchstart', stopPropagation);
@@ -307,14 +330,15 @@
 
             Game.initPhysics();
             score = 0;
-            lastBuffScore = 0;
+            hammersUsed = 0;
+            isBuffActive = false;
 
-            // Генерируем ПЕРВЫЙ "следующий" шар
-            upcomingBallIndex = Math.floor(Math.random() * 5); // 0-4 уровни
+            // Генерируем ПЕРВЫЙ "следующий" шар (ТОЛЬКО 0, 1, 2)
+            upcomingBallIndex = Math.floor(Math.random() * 3); 
 
             Game.updateUI();
             gameActive = true;
-            Game.spawnNext(); // Здесь создастся шар из upcoming, а upcoming обновится
+            Game.spawnNext();
         },
 
         initPhysics: () => {
@@ -367,26 +391,23 @@
         spawnNext: () => {
             if(!gameActive) return;
 
-            // 1. Берем шар, который был в "очереди"
             const indexToSpawn = upcomingBallIndex;
 
-            // 2. Генерируем НОВЫЙ шар для очереди (0-4 уровень)
-            upcomingBallIndex = Math.floor(Math.random() * 5);
+            // Генерируем следующий (ТОЛЬКО УРОВНИ 0, 1, 2)
+            upcomingBallIndex = Math.floor(Math.random() * 3);
 
-            // 3. Обновляем иконку "След." в интерфейсе
             const skin = SKINS_DB[currentSkin];
             const nextLevelData = skin.levels[upcomingBallIndex];
             const nextIconEl = document.getElementById('next-ball-icon');
             nextIconEl.innerText = nextLevelData.label;
             nextIconEl.style.backgroundColor = nextLevelData.color;
 
-            // 4. Создаем физический шар в руках
             const size = BALL_SIZES[indexToSpawn];
             const levelData = skin.levels[indexToSpawn];
 
             currentBall = Matter.Bodies.circle(W/2, 60, size, {
                 isStatic: true,
-                label: indexToSpawn, // Это индекс уровня
+                label: indexToSpawn,
                 render: { fillStyle: levelData.color }
             });
             Matter.World.add(engine.world, currentBall);
@@ -405,7 +426,7 @@
             if(!gameActive) return;
             if(e.target.closest('#hud') || e.target.closest('.menu-overlay')) return;
 
-            // МОЛОТОК
+            // МОЛОТОК (УНИЧТОЖЕНИЕ)
             if(isBuffActive) {
                 const x = (e.touches ? e.touches[0].clientX : e.clientX);
                 const y = (e.touches ? e.touches[0].clientY : e.clientY);
@@ -415,10 +436,12 @@
 
                 if(clickedBody) {
                     Matter.World.remove(engine.world, clickedBody);
+
+                    // Потратили молоток
+                    hammersUsed++;
                     isBuffActive = false;
-                    document.body.classList.remove('destroy-mode');
-                    document.getElementById('buff-btn').classList.remove('ready');
-                    document.getElementById('buff-icon').innerText = "🔨";
+
+                    Game.exitBuffMode();
                     Game.updateUI();
                 }
                 return;
@@ -437,26 +460,28 @@
             }
         },
 
+        exitBuffMode: () => {
+            document.body.classList.remove('destroy-mode');
+            const btn = document.getElementById('buff-btn');
+            btn.classList.remove('active-mode'); 
+            document.getElementById('buff-icon').innerText = "🔨";
+        },
+
         handleCollisions: (event) => {
             const pairs = event.pairs;
             pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
 
-                // Проверяем, что это игровые шары (label - число)
                 if(Number.isInteger(bodyA.label) && Number.isInteger(bodyB.label)) {
                     if(bodyA.label === bodyB.label) {
                         const idx = bodyA.label;
 
-                        // Удаляем старые шары
                         Matter.World.remove(engine.world, [bodyA, bodyB]);
 
-                        // --- ЛОГИКА АРБУЗОВ (МАКС УРОВЕНЬ) ---
                         if (idx === BALL_SIZES.length - 1) {
-                            // Если соединились два последних шара - они исчезают
-                            score += 1000; // Бонус
+                            score += 1000;
                             Game.playSound('merge');
                         } else {
-                            // Обычное слияние
                             const newIdx = idx + 1;
                             const midX = (bodyA.position.x + bodyB.position.x)/2;
                             const midY = (bodyA.position.y + bodyB.position.y)/2;
@@ -483,28 +508,50 @@
         },
 
         activateBuff: (e) => {
-            if(score - lastBuffScore >= 2500 && !isBuffActive) {
+            // Считаем сколько всего накопили
+            const totalHammersEarned = Math.floor(score / SCORE_PER_HAMMER);
+            const hammersAvailable = totalHammersEarned - hammersUsed;
+
+            // Если включен режим - выключаем (отмена)
+            if(isBuffActive) {
+                isBuffActive = false;
+                Game.exitBuffMode();
+                return;
+            }
+
+            // Если есть доступные и режим выключен - включаем
+            if(hammersAvailable > 0) {
                 isBuffActive = true;
-                lastBuffScore = score;
                 document.body.classList.add('destroy-mode');
                 const btn = document.getElementById('buff-btn');
-                btn.classList.remove('ready'); 
+                btn.classList.add('active-mode'); 
                 document.getElementById('buff-icon').innerText = "❌";
-                document.getElementById('buff-progress').style.height = '0%';
             }
         },
 
         updateUI: () => {
             document.getElementById('score-val').innerText = score;
-            const progress = Math.min(score - lastBuffScore, 2500);
-            const percentage = (progress / 2500) * 100;
+
+            // ЛОГИКА НАКОПЛЕНИЯ
+            const totalHammersEarned = Math.floor(score / SCORE_PER_HAMMER);
+            const hammersAvailable = totalHammersEarned - hammersUsed;
+            const progress = score % SCORE_PER_HAMMER;
+            const percentage = (progress / SCORE_PER_HAMMER) * 100;
+
+            // Обновляем прогресс бар
             document.getElementById('buff-progress').style.height = percentage + '%';
 
             const btn = document.getElementById('buff-btn');
-            if(progress >= 2500) {
-                if(!btn.classList.contains('ready') && !isBuffActive) {
-                    btn.classList.add('ready');
-                }
+            const badge = document.getElementById('buff-count-badge');
+
+            // Обновляем бейдж с количеством
+            if(hammersAvailable > 0) {
+                badge.innerText = hammersAvailable;
+                badge.classList.add('visible');
+                if(!isBuffActive) btn.classList.add('ready');
+            } else {
+                badge.classList.remove('visible');
+                btn.classList.remove('ready');
             }
         },
 
@@ -538,7 +585,6 @@
                 }
             });
 
-            // Линия смерти
             ctx.beginPath();
             ctx.moveTo(0, 150);
             ctx.lineTo(W, 150);
